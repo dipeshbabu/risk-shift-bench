@@ -1,76 +1,251 @@
-# Quantifying Risk Aversion and Risk-Seeking Behavior Through Utility-Based Policy Learning in Blackjack
+# Risk Preference Inference
 
-This repository contains the implementation and analysis for the research project titled _"Quantifying Risk Aversion and Risk-Seeking Behavior Through Utility-Based Policy Learning in Blackjack"_. The project explores decision-making under risk and uncertainty through utility-based policies in a simulated Blackjack environment.
+Utilities for adaptive risk-sensitive planning under bankroll constraints. This
+repository contains a compact Blackjack benchmark, distributional objectives,
+state-adaptive risk policies, simulation tooling, and the earlier
+decision-inference utilities used for synthetic and human hit/stand data.
 
-## Overview
+The central research question is whether risk sensitivity should be static or
+state-adaptive in sequential decision problems with ruin, target, drawdown, and
+distribution-shift constraints.
 
-In this research, we modeled Blackjack as a Markov Decision Process (MDP) and applied various utility functions such as Linear, Exponential, Quadratic, Logarithimic, and Quartic - to investigate how different risk preferences influence decision-making. We used dynamic programming techniques to derive optimal policies and analyzed the outcomes using simulations and data analysis.
+## Repository Contents
 
-## Key Features
+- `risk_preference_inference.envs`: benchmark task definitions such as mean-return, ruin-constrained, target-reaching, drawdown, and shifted-deck regimes.
+- `risk_preference_inference.objectives`: mean, CVaR, entropic risk, OCE, ruin-constrained, and target-seeking distributional objectives.
+- `risk_preference_inference.adaptive_risk`: state-adaptive CVaR schedules and adaptive risk objectives.
+- `risk_preference_inference.policies`: benchmark policies that choose actions from distributional objectives.
+- `risk_preference_inference.return_distributions`: exact hand-level payoff and bankroll distributions under an infinite-deck model.
+- `risk_preference_inference.benchmark`: policy x task simulation and aggregate risk metrics.
+- `risk_preference_inference.reporting`: JSONL, JSON, and CSV benchmark writers.
+- `risk_preference_inference.blackjack`: core Blackjack state utilities.
+- `risk_preference_inference.risk_models`: choice-model baselines for human/synthetic hit-stand prediction.
+- `risk_preference_inference.dataset`: decision records and JSONL IO.
+- `risk_preference_inference.fitting`: likelihood-based fitting for prospect-style choice models.
+- `risk_preference_inference.evaluation`: action-prediction metrics.
+- `risk_preference_inference.active_query`: disagreement-based state selection for data collection.
+- `risk_preference_inference.synthetic`: synthetic decision data generation.
+- `risk_preference_inference.statistics`: bootstrap confidence intervals and paired policy comparisons.
+- `risk_preference_inference.toy_envs`: non-Blackjack toy risk tasks.
 
-1. **Blackjack as an MDP**: Models the game as a Markov Decision Process with defined states, actions, and rewards.
-2. **Utility-Based Policies**: Implements utility functions to explore risk-averse, risk-neutral, and risk-seeking behaviors.
-3. **Simulations**: Evaluates decision-making strategies over multiple rounds using precomputed optimal actions.
-4. **Data Analysis**: Provides insights into the impact of different utility functions on gameplay outcomes.
+## Basic Usage
 
-## Results
+Install dependencies with `uv`:
 
-The simulation study evaluated five utility functions (Linear, Quadratic, Exponential, Logarithmic, and Quartic) over 300 rounds with 15 games per round. Starting with a 500 bankroll and 20 bet size, each simulation used a single deck.
+```bash
+uv sync
+```
 
-### Key Statistics
+Run the adaptive risk benchmark:
 
-| Utility Function | Mean Bankroll | Standard Deviation |
-| ---------------- | ------------- | ------------------ |
-| Linear           | 489.27        | 60.32              |
-| Quadratic        | 497.33        | 64.65              |
-| Exponential      | 494.13        | 60.60              |
-| Logarithmic      | 497.33        | 62.77              |
-| Quartic          | 492.00        | 58.10              |
+```bash
+uv run python -m experiments.risk_benchmark \
+  --episodes 100 \
+  --hand-depth 4
+```
 
-### Distribution Analysis
+The command writes:
 
-The payoff distributions revealed distinct patterns for each utility function. The Quartic function showed the highest volatility with multiple local maxima, while the Linear function demonstrated the lowest probability of high payoffs (>600).
+- `artifacts/risk_benchmark/episodes.jsonl`: one row per simulated episode.
+- `artifacts/risk_benchmark/summary.csv`: policy x task aggregate metrics.
+- `artifacts/risk_benchmark/summary.json`: run metadata and summary records.
 
-### Cumulative Returns
+Run a small focused task:
 
-The Linear utility function exhibited the most stable progression, while the Quartic function showed the largest round-to-round variations. Quadratic and Logarithmic functions displayed significant variability with alternating periods of gains and losses.
+```bash
+uv run python -m experiments.risk_benchmark \
+  --tasks RiskBlackjack-RuinConstraint-v0 \
+  --episodes 50 \
+  --hand-depth 2
+```
 
-### Survey Results
+Run from a checked-in config:
 
-A survey of approximately 35 respondents revealed:
+```bash
+uv run python -m experiments.risk_benchmark --config configs/benchmark_smoke.json
+```
 
-- Most participants self-identified as moderate or neutral risk-takers.
-- The Quartic utility function (35.3%) was the most selected risk profile.
-- Quadratic (26.5%) and Exponential (17.6%) functions were the next most common choices.
-- Linear (8.8%) and Logarithmic (11.8%) functions were less frequently selected.
+Validate the full paper pipeline without launching the expensive runs:
 
-### Figures
+```bash
+uv run python -m experiments.validate_pipeline
+```
 
-- **Figure 1**: PDF of Payoff Values For Functions  
-  ![Figure 1](plots/Figure_1.png)
-- **Figure 2**: Cumulative Returns by Utility Function  
-  ![Figure 2](plots/Figure_2.png)
-- **Figure 3**: Respondents Self-Evaluation of Risk Tolerance  
-  ![Figure 3](plots/Figure_3.png)
-- **Figure 4**: Respondents' Results (Risk Profile Preferences)  
-  ![Figure 4](plots/Figure_4.png)
+Run the full paper artifact pipeline:
 
-### Citations:
+```bash
+uv run python -m experiments.run_paper_pipeline
+```
 
-1. [Figure 1: PDF of Payoff Values For Functions](plots/Figure_1.png)
-2. [Figure 2: Cumulative Returns by Utility Function](plots/Figure_2.png)
-3. [Figure 3: Respondents Self-Evaluation of Risk Tolerance](plots/Figure_3.png)
-4. [Figure 4: Respondents' Results](plots/Figure_4.png)
+The pipeline writes a single run directory:
 
-## Contact
+```text
+artifacts/paper_run_YYYYMMDD_HHMMSS/
+|-- benchmark/
+|-- adaptive_search/
+|-- toy_benchmark/
+|-- statistics/
+|-- tables/
+|-- figures/
+|-- policy_diagnostics/
+|-- theory_diagnostics/
+|-- multiround_exact/
+|-- configs/
+`-- manifest.json
+```
 
-For questions or collaborations, feel free to reach out to the authors:
+Resume a partially completed run:
 
-- **Praveen Bandla**  
-  Email: [praveen.bandla@nyu.edu](mailto:praveen.bandla@nyu.edu)
+```bash
+uv run python -m experiments.run_paper_pipeline \
+  --run-root artifacts/paper_run_YYYYMMDD_HHMMSS \
+  --skip-existing
+```
 
-- **Tanishq Sardana**  
-  Email: [ts5430@nyu.edu](mailto:ts5430@nyu.edu)
+Check artifact completeness:
 
-- **Dipesh Tharu Mahato**  
-  Email: [dm6259@nyu.edu](mailto:dm6259@nyu.edu)
+```bash
+uv run python -m experiments.check_artifacts \
+  --run-root artifacts/paper_run_YYYYMMDD_HHMMSS
+```
+
+Search adaptive CVaR schedules on train tasks and evaluate held-out tasks:
+
+```bash
+uv run python -m experiments.adaptive_search --config configs/adaptive_search_smoke.json
+```
+
+Export exact small-horizon final-bankroll distributions:
+
+```bash
+uv run python -m experiments.multiround_exact \
+  --task RiskBlackjack-Mean-v0 \
+  --rounds 2 \
+  --hand-depth 1
+```
+
+Export policy diagnostics:
+
+```bash
+uv run python -m experiments.policy_diagnostics \
+  --task RiskBlackjack-RuinConstraint-v0
+```
+
+Build compact tables from a benchmark summary:
+
+```bash
+uv run python -m experiments.build_tables \
+  --summary artifacts/risk_benchmark/summary.json
+```
+
+Generate statistical reports and SVG figures:
+
+```bash
+uv run python -m experiments.statistical_report \
+  --episodes artifacts/risk_benchmark/episodes.jsonl
+
+uv run python -m experiments.make_figures \
+  --summary artifacts/risk_benchmark/summary.json
+```
+
+Run non-Blackjack toy tasks:
+
+```bash
+uv run python -m experiments.toy_benchmark --episodes 100
+```
+
+## Benchmark Policies
+
+The default benchmark compares:
+
+- `basic_strategy_heuristic`
+- `expected_value`
+- `fixed_cvar_05`
+- `fixed_entropic_001`
+- `fixed_oce_1`
+- `ruin_constrained_mean`
+- `target_seeking_mean`
+- `adaptive_cvar`
+
+The key comparison is static risk objectives versus state-adaptive risk
+objectives under changing bankroll and task constraints.
+
+## Benchmark Metrics
+
+Each policy/task pair reports:
+
+- mean final bankroll,
+- standard deviation of final bankroll,
+- 5% CVaR of final bankroll,
+- ruin probability,
+- target-hit probability,
+- mean maximum drawdown,
+- mean rounds played.
+
+## Decision-Inference Workflow
+
+The repository also includes the earlier decision-modeling workflow for fitting
+choice models to synthetic or human hit/stand records.
+
+Run the synthetic model-comparison workflow:
+
+```bash
+uv run python -m experiments.synthetic_experiment \
+  --subjects 4 \
+  --decisions 60 \
+  --split within_subject
+```
+
+Run a parameter-recovery check:
+
+```bash
+uv run python -m experiments.parameter_recovery \
+  --subjects 6 \
+  --decisions 120
+```
+
+Collect a small terminal-based human decision file:
+
+```bash
+uv run python -m experiments.collect_decisions \
+  --subject-id subject_001 \
+  --decisions 30
+```
+
+## Decision Data Format
+
+Each JSONL decision row has this shape:
+
+```json
+{
+  "subject_id": "subject_000",
+  "episode_id": "synthetic_000",
+  "step_id": 0,
+  "player_cards": [10, 6],
+  "dealer_card": 10,
+  "current_bankroll": 500.0,
+  "initial_bankroll": 500.0,
+  "bet": 20.0,
+  "recent_outcomes": [],
+  "action_taken": "stand",
+  "target_bankroll": null,
+  "timestamp": null
+}
+```
+
+`action_taken` must be `hit` or `stand`.
+
+## Notes
+
+The benchmark currently uses an infinite-deck approximation so hand-level return
+distributions are fast and deterministic. Generated artifacts, local datasets,
+reports, plots, notebooks, virtual environments, and caches are intentionally
+kept outside git.
+
+## Verification
+
+Run the lightweight regression tests with:
+
+```bash
+uv run python -m unittest discover -s tests -v
+```

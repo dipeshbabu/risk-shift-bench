@@ -1,4 +1,23 @@
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Generated research outputs
+artifacts/
+data/raw/
+data/interim/
+data/processed/
+reports/
+plots/
+*.svg
+*.pdf
+*.pkl
+
+# Legacy transition artifacts
 optimal_policy_training/dealer_transitions.pkl
 optimal_policy_training/player_transitions.pkl
 optimal_policy_training/states.pkl
-data_analyis/analysis.ipynb

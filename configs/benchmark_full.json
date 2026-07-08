@@ -1,0 +1,8 @@
+{
+  "episodes": 300,
+  "seed": 0,
+  "hand_depth": 3,
+  "tasks": null,
+  "policy_set": "strong",
+  "out_dir": "artifacts/benchmark_full"
+}

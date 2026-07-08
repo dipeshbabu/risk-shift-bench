@@ -1,0 +1,9 @@
+{
+  "episodes": 5,
+  "seed": 0,
+  "hand_depth": 1,
+  "tasks": ["RiskBlackjack-Mean-v0"],
+  "policy_set": "core",
+  "out_dir": "artifacts/benchmark_smoke"
+}
+
