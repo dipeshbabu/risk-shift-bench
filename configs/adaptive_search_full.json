@@ -9,9 +9,9 @@
     "RiskBlackjack-LowCardShift-v0",
     "RiskBlackjack-HighCardShift-v0"
   ],
-  "episodes": 200,
+  "episodes": 40,
   "seed": 0,
-  "hand_depth": 2,
-  "max_candidates": 64,
+  "hand_depth": 1,
+  "max_candidates": 12,
   "out_dir": "artifacts/adaptive_search_full"
 }
