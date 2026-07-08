@@ -38,9 +38,8 @@ def benchmark_tasks() -> list[RiskTask]:
     return [
         RiskTask(name="RiskBlackjack-Mean-v0"),
         RiskTask(name="RiskBlackjack-RuinConstraint-v0", initial_bankroll=240.0, target_bankroll=360.0),
-        RiskTask(name="RiskBlackjack-Target-v0", target_bankroll=760.0),
+        RiskTask(name="RiskBlackjack-Target-v0", rounds=30, target_bankroll=640.0),
         RiskTask(name="RiskBlackjack-Drawdown-v0", drawdown_limit=0.12),
         RiskTask(name="RiskBlackjack-LowCardShift-v0", card_probs=LOW_CARD_SHIFT),
         RiskTask(name="RiskBlackjack-HighCardShift-v0", card_probs=HIGH_CARD_SHIFT),
     ]
-

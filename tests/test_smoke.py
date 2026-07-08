@@ -8,7 +8,14 @@ from risk_preference_inference.envs import RiskTask
 from risk_preference_inference.evaluation import evaluate
 from risk_preference_inference.multiround_distributions import final_bankroll_distribution
 from risk_preference_inference.objectives import mean
-from risk_preference_inference.policy_registry import core_policies, learned_adaptive_cvar_policy
+from risk_preference_inference.policy_registry import (
+    core_policies,
+    learned_adaptive_cvar_policy,
+    state_adaptive_utility_policy,
+    strong_baseline_grid,
+)
+from risk_preference_inference.adaptive_search import search_adaptive_utility_policy
+from risk_preference_inference.ablations import run_ablation_study
 from risk_preference_inference.toy_envs import run_toy_benchmark
 from risk_preference_inference.run_management import paper_run_paths, required_artifacts
 from risk_preference_inference.policy import action_probabilities
@@ -90,6 +97,53 @@ class SmokeTests(unittest.TestCase):
         probs = learned_adaptive_cvar_policy().action_probabilities(state, task, rounds_remaining=2, hand_depth=1)
         self.assertEqual(set(probs), {"hit", "stand"})
 
+    def test_state_adaptive_utility_policy_scores(self):
+        task = RiskTask(name="utility-test", rounds=2, initial_bankroll=120, target_bankroll=150)
+        state = DecisionState((10, 6), 10, current_bankroll=120, initial_bankroll=120, target_bankroll=150)
+        probs = state_adaptive_utility_policy().action_probabilities(state, task, rounds_remaining=2, hand_depth=1)
+        self.assertEqual(set(probs), {"hit", "stand"})
+        self.assertLess(abs(sum(probs.values()) - 1.0), 1e-9)
+
+    def test_state_adaptive_utility_search_runs(self):
+        train_task = RiskTask(name="utility-train", rounds=2, initial_bankroll=120, target_bankroll=150)
+        test_task = RiskTask(name="utility-test", rounds=2, initial_bankroll=120, target_bankroll=150)
+        result = search_adaptive_utility_policy(
+            train_tasks=[train_task],
+            test_tasks=[test_task],
+            episodes=2,
+            seed=4,
+            hand_depth=1,
+            smoke=True,
+        )
+        self.assertTrue(result.test_summaries)
+
+    def test_ablation_study_runs(self):
+        task = RiskTask(name="ablation-test", rounds=2, initial_bankroll=120, target_bankroll=150)
+        summaries, aggregate_scores, task_scores = run_ablation_study(
+            tasks=[task],
+            episodes=2,
+            seed=5,
+            hand_depth=1,
+        )
+        self.assertTrue(summaries)
+        self.assertTrue(aggregate_scores)
+        self.assertTrue(task_scores)
+
+    def test_regime_adaptive_policy_scores(self):
+        task = RiskTask(name="regime-test", rounds=2, initial_bankroll=120, target_bankroll=150)
+        state = DecisionState((10, 6), 10, current_bankroll=120, initial_bankroll=120, target_bankroll=150)
+        policy = next(policy for policy in strong_baseline_grid() if policy.name == "regime_adaptive_ensemble")
+        probs = policy.action_probabilities(state, task, rounds_remaining=2, hand_depth=1)
+        self.assertEqual(set(probs), {"hit", "stand"})
+        self.assertLess(abs(sum(probs.values()) - 1.0), 1e-9)
+
+    def test_regime_policy_does_not_target_seek_on_mean_task(self):
+        task = RiskTask(name="mean-like", rounds=25, initial_bankroll=500, target_bankroll=650)
+        state = DecisionState((10, 6), 10, current_bankroll=540, initial_bankroll=500, target_bankroll=650)
+        policy = next(policy for policy in strong_baseline_grid() if policy.name == "regime_adaptive_ensemble")
+        delegate = policy._delegate(state, task, rounds_remaining=8, peak_bankroll=560)
+        self.assertNotEqual(delegate.name, "regime_target_mean")
+
     def test_toy_benchmark_runs(self):
         results, summaries = run_toy_benchmark(episodes=2, seed=1)
         self.assertTrue(results)
@@ -121,6 +175,7 @@ class SmokeTests(unittest.TestCase):
         artifacts = required_artifacts(paths, include_exact=False)
         self.assertIn("artifacts/test_run/manifest.json", artifacts)
         self.assertIn("artifacts/test_run/configs/benchmark_config.json", artifacts)
+        self.assertIn("artifacts/test_run/ablations/summary.json", artifacts)
 
 
 if __name__ == "__main__":

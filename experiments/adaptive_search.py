@@ -6,7 +6,12 @@ import argparse
 from dataclasses import asdict
 from pathlib import Path
 
-from risk_preference_inference.adaptive_search import evaluate_strong_baselines, search_adaptive_policy
+from risk_preference_inference.adaptive_search import (
+    evaluate_strong_baselines,
+    policy_score_report,
+    search_adaptive_policy,
+    search_adaptive_utility_policy,
+)
 from risk_preference_inference.config import load_adaptive_search_config
 from risk_preference_inference.envs import benchmark_tasks
 from risk_preference_inference.learned_adaptive_search import search_learned_adaptive_policy
@@ -51,18 +56,35 @@ def main() -> None:
         smoke=smoke,
         max_candidates=config.max_candidates,
     )
+    utility_result = search_adaptive_utility_policy(
+        train_tasks=train_tasks,
+        test_tasks=test_tasks,
+        episodes=config.episodes,
+        seed=config.seed + 375_000,
+        hand_depth=config.hand_depth,
+        smoke=smoke,
+        max_candidates=config.max_candidates,
+    )
     baseline_test = evaluate_strong_baselines(
         tasks=test_tasks,
         episodes=config.episodes,
         seed=config.seed + 500_000,
         hand_depth=config.hand_depth,
     )
+    all_test_summaries = (
+        baseline_test
+        + result.test_summaries
+        + learned_result.test_summaries
+        + utility_result.test_summaries
+    )
 
     payload = {
         "config": asdict(config),
         "best_adaptive": asdict(result),
         "best_learned_adaptive": asdict(learned_result),
+        "best_adaptive_utility": asdict(utility_result),
         "baseline_test_summaries": baseline_test,
+        "test_score_report": policy_score_report(all_test_summaries),
     }
     out_dir = args.out_dir or config.out_dir
     write_json(Path(out_dir) / "summary.json", payload)
@@ -71,6 +93,8 @@ def main() -> None:
     print(f"best_params={asdict(result.params)}")
     print(f"best_learned_test_score={learned_result.test_score:.3f}")
     print(f"best_learned_params={asdict(learned_result.params)}")
+    print(f"best_adaptive_utility_test_score={utility_result.test_score:.3f}")
+    print(f"best_adaptive_utility_params={asdict(utility_result.params)}")
 
 
 if __name__ == "__main__":

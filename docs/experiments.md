@@ -45,6 +45,18 @@ Adaptive schedule search:
 uv run python -m experiments.adaptive_search --config configs/adaptive_search_full.json
 ```
 
+The search artifact includes tuned CVaR schedules, tuned adaptive utility
+schedules, strong static baseline summaries, and a held-out score report.
+
+Regime-policy ablations:
+
+```bash
+uv run python -m experiments.ablation_study --config configs/benchmark_full.json
+```
+
+The ablation artifact reports aggregate scores, per-task scores, and raw
+summary metrics for branch-disabled variants of the regime-adaptive ensemble.
+
 Statistical report:
 
 ```bash

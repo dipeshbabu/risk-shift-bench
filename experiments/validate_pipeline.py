@@ -5,7 +5,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from risk_preference_inference.adaptive_search import candidate_params
+from risk_preference_inference.adaptive_search import candidate_params, utility_candidate_params
+from risk_preference_inference.ablations import ablation_policies
 from risk_preference_inference.config import load_adaptive_search_config, load_benchmark_config
 from risk_preference_inference.envs import benchmark_tasks
 from risk_preference_inference.learned_adaptive_search import linear_candidates
@@ -36,19 +37,26 @@ def main() -> None:
     policy_count = len(core_policies()) if benchmark_config.policy_set == "core" else len(strong_baseline_grid())
     task_count = len(benchmark_config.tasks) if benchmark_config.tasks is not None else len(benchmark_tasks())
     benchmark_episodes = policy_count * task_count * benchmark_config.episodes
+    ablation_rollouts = len(ablation_policies()) * task_count * benchmark_config.episodes
 
     adaptive_candidates = len(candidate_params(smoke=False))
+    utility_candidates = len(utility_candidate_params(smoke=False))
     learned_candidates = len(linear_candidates(smoke=False))
     adaptive_evaluated = min(adaptive_candidates, adaptive_config.max_candidates or adaptive_candidates)
+    utility_evaluated = min(utility_candidates, adaptive_config.max_candidates or utility_candidates)
     learned_evaluated = min(learned_candidates, adaptive_config.max_candidates or learned_candidates)
 
     print("pipeline validation ok")
     print(f"benchmark_tasks={task_count}")
     print(f"benchmark_policies={policy_count}")
     print(f"benchmark_episode_rollouts={benchmark_episodes}")
+    print(f"ablation_policies={len(ablation_policies())}")
+    print(f"ablation_episode_rollouts={ablation_rollouts}")
     print(f"adaptive_candidates_total={adaptive_candidates}")
+    print(f"adaptive_utility_candidates_total={utility_candidates}")
     print(f"learned_candidates_total={learned_candidates}")
     print(f"adaptive_candidates_evaluated={adaptive_evaluated}")
+    print(f"adaptive_utility_candidates_evaluated={utility_evaluated}")
     print(f"learned_candidates_evaluated={learned_evaluated}")
     print(f"benchmark_out={benchmark_config.out_dir}")
     print(f"adaptive_out={adaptive_config.out_dir}")
@@ -56,4 +64,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

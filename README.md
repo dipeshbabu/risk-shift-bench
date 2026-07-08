@@ -13,8 +13,8 @@ distribution-shift constraints.
 
 - `risk_preference_inference.envs`: benchmark task definitions such as mean-return, ruin-constrained, target-reaching, drawdown, and shifted-deck regimes.
 - `risk_preference_inference.objectives`: mean, CVaR, entropic risk, OCE, ruin-constrained, and target-seeking distributional objectives.
-- `risk_preference_inference.adaptive_risk`: state-adaptive CVaR schedules and adaptive risk objectives.
-- `risk_preference_inference.policies`: benchmark policies that choose actions from distributional objectives.
+- `risk_preference_inference.adaptive_risk`: state-adaptive CVaR schedules, adaptive utility objectives, and constraint-aware risk gates.
+- `risk_preference_inference.policies`: benchmark policies, including objective policies and a regime-adaptive ensemble.
 - `risk_preference_inference.return_distributions`: exact hand-level payoff and bankroll distributions under an infinite-deck model.
 - `risk_preference_inference.benchmark`: policy x task simulation and aggregate risk metrics.
 - `risk_preference_inference.reporting`: JSONL, JSON, and CSV benchmark writers.
@@ -83,6 +83,7 @@ The pipeline writes a single run directory:
 artifacts/paper_run_YYYYMMDD_HHMMSS/
 |-- benchmark/
 |-- adaptive_search/
+|-- ablations/
 |-- toy_benchmark/
 |-- statistics/
 |-- tables/
@@ -109,10 +110,16 @@ uv run python -m experiments.check_artifacts \
   --run-root artifacts/paper_run_YYYYMMDD_HHMMSS
 ```
 
-Search adaptive CVaR schedules on train tasks and evaluate held-out tasks:
+Search adaptive CVaR and adaptive utility schedules on train tasks and evaluate held-out tasks:
 
 ```bash
 uv run python -m experiments.adaptive_search --config configs/adaptive_search_smoke.json
+```
+
+Run branch-level ablations for the regime-adaptive ensemble:
+
+```bash
+uv run python -m experiments.ablation_study --config configs/benchmark_full.json
 ```
 
 Export exact small-horizon final-bankroll distributions:
@@ -166,6 +173,8 @@ The default benchmark compares:
 - `ruin_constrained_mean`
 - `target_seeking_mean`
 - `adaptive_cvar`
+- `state_adaptive_utility`
+- `regime_adaptive_ensemble`
 
 The key comparison is static risk objectives versus state-adaptive risk
 objectives under changing bankroll and task constraints.

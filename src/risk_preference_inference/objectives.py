@@ -50,6 +50,14 @@ def probability_at_or_above(distribution: Distribution, threshold: float) -> flo
     return sum(prob for value, prob in distribution if value >= threshold)
 
 
+def expected_shortfall_below(distribution: Distribution, threshold: float) -> float:
+    return sum(prob * max(0.0, threshold - value) for value, prob in distribution)
+
+
+def expected_excess_above(distribution: Distribution, threshold: float) -> float:
+    return sum(prob * max(0.0, value - threshold) for value, prob in distribution)
+
+
 def entropic_ce(distribution: Distribution, risk_aversion: float) -> float:
     eta = float(risk_aversion)
     if abs(eta) < 1e-9:
@@ -160,4 +168,3 @@ class TargetSeekingObjective(DistributionalObjective):
     def score(self, distribution: Distribution, context: ObjectiveContext) -> float:
         target_prob = probability_at_or_above(distribution, context.target_bankroll)
         return self.base.score(distribution, context) + self.target_bonus * target_prob
-

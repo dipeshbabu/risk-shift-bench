@@ -5,8 +5,10 @@ from __future__ import annotations
 from risk_preference_inference.adaptive_risk import (
     AdaptiveCVaRObjective,
     AdaptiveCVaRSchedule,
+    AdaptiveUtilitySchedule,
     LearnedAdaptiveCVaRObjective,
     LinearAdaptiveCVaRSchedule,
+    StateAdaptiveUtilityObjective,
 )
 from risk_preference_inference.objectives import (
     CVaRObjective,
@@ -16,7 +18,7 @@ from risk_preference_inference.objectives import (
     RuinConstrainedObjective,
     TargetSeekingObjective,
 )
-from risk_preference_inference.policies import BasicStrategyPolicy, BenchmarkPolicy, StaticObjectivePolicy
+from risk_preference_inference.policies import BasicStrategyPolicy, BenchmarkPolicy, RegimeAdaptivePolicy, StaticObjectivePolicy
 
 
 def adaptive_cvar_policy(
@@ -74,6 +76,46 @@ def learned_adaptive_cvar_policy(
     return StaticObjectivePolicy(objective, name=name or "learned_adaptive_cvar")
 
 
+def state_adaptive_utility_policy(
+    low_bankroll_ratio: float = 0.55,
+    safe_bankroll_ratio: float = 1.15,
+    drawdown_trigger: float = 0.12,
+    target_window: float = 0.35,
+    terminal_window: int = 8,
+    cvar_alpha: float = 0.2,
+    entropic_eta: float = 0.01,
+    risk_weight: float = 0.35,
+    ruin_penalty: float = 400.0,
+    drawdown_penalty: float = 0.35,
+    target_bonus: float = 180.0,
+    target_excess_weight: float = 0.15,
+    name: str | None = None,
+) -> BenchmarkPolicy:
+    schedule = AdaptiveUtilitySchedule(
+        low_bankroll_ratio=low_bankroll_ratio,
+        safe_bankroll_ratio=safe_bankroll_ratio,
+        drawdown_trigger=drawdown_trigger,
+        target_window=target_window,
+        terminal_window=terminal_window,
+    )
+    objective = StateAdaptiveUtilityObjective(
+        schedule=schedule,
+        cvar_alpha=cvar_alpha,
+        entropic_eta=entropic_eta,
+        risk_weight=risk_weight,
+        ruin_penalty=ruin_penalty,
+        drawdown_penalty=drawdown_penalty,
+        target_bonus=target_bonus,
+        target_excess_weight=target_excess_weight,
+    )
+    policy_name = name or (
+        f"adaptive_utility_rw{risk_weight:g}_"
+        f"lb{low_bankroll_ratio:g}_sb{safe_bankroll_ratio:g}_"
+        f"tb{target_bonus:g}"
+    )
+    return StaticObjectivePolicy(objective, name=policy_name)
+
+
 def core_policies() -> list[BenchmarkPolicy]:
     return [
         BasicStrategyPolicy(),
@@ -84,6 +126,8 @@ def core_policies() -> list[BenchmarkPolicy]:
         StaticObjectivePolicy(RuinConstrainedObjective(MeanObjective(), ruin_penalty=400.0), name="ruin_constrained_mean"),
         StaticObjectivePolicy(TargetSeekingObjective(MeanObjective(), target_bonus=150.0), name="target_seeking_mean"),
         adaptive_cvar_policy(name="adaptive_cvar"),
+        state_adaptive_utility_policy(name="state_adaptive_utility"),
+        RegimeAdaptivePolicy(),
     ]
 
 
@@ -101,4 +145,16 @@ def strong_baseline_grid() -> list[BenchmarkPolicy]:
         policies.append(StaticObjectivePolicy(TargetSeekingObjective(MeanObjective(), target_bonus=bonus), name=f"target_mean_{bonus:g}"))
     policies.append(adaptive_cvar_policy(name="adaptive_cvar_default"))
     policies.append(learned_adaptive_cvar_policy(name="learned_adaptive_cvar_default"))
+    policies.append(state_adaptive_utility_policy(name="state_adaptive_utility_default"))
+    policies.append(
+        state_adaptive_utility_policy(
+            low_bankroll_ratio=0.45,
+            safe_bankroll_ratio=1.05,
+            risk_weight=0.2,
+            target_bonus=250.0,
+            target_excess_weight=0.25,
+            name="state_adaptive_utility_aggressive",
+        )
+    )
+    policies.append(RegimeAdaptivePolicy())
     return policies

@@ -68,6 +68,11 @@ def main() -> None:
         skip_existing=args.skip_existing,
     )
     run(
+        [py, "-m", "experiments.ablation_study", "--config", args.benchmark_config, "--out-dir", paths.ablations],
+        outputs=[f"{paths.ablations}/summary.json", f"{paths.ablations}/aggregate_scores.csv"],
+        skip_existing=args.skip_existing,
+    )
+    run(
         [py, "-m", "experiments.toy_benchmark", "--episodes", str(args.toy_episodes), "--out-dir", paths.toy_benchmark],
         outputs=[f"{paths.toy_benchmark}/summary.json", f"{paths.toy_benchmark}/episodes.json"],
         skip_existing=args.skip_existing,

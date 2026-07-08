@@ -17,6 +17,7 @@ class PaperRunPaths:
     root: str
     benchmark: str
     adaptive_search: str
+    ablations: str
     toy_benchmark: str
     statistics: str
     tables: str
@@ -38,6 +39,7 @@ def paper_run_paths(root: str) -> PaperRunPaths:
         root=root,
         benchmark=f"{root}/benchmark",
         adaptive_search=f"{root}/adaptive_search",
+        ablations=f"{root}/ablations",
         toy_benchmark=f"{root}/toy_benchmark",
         statistics=f"{root}/statistics",
         tables=f"{root}/tables",
@@ -104,6 +106,9 @@ def required_artifacts(paths: PaperRunPaths, include_exact: bool = True) -> list
         f"{paths.benchmark}/summary.csv",
         f"{paths.benchmark}/summary.json",
         f"{paths.adaptive_search}/summary.json",
+        f"{paths.ablations}/summary.json",
+        f"{paths.ablations}/aggregate_scores.csv",
+        f"{paths.ablations}/task_scores.csv",
         f"{paths.toy_benchmark}/summary.json",
         f"{paths.toy_benchmark}/episodes.json",
         f"{paths.statistics}/final_bankroll_ci.csv",

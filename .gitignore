@@ -13,6 +13,7 @@ data/interim/
 data/processed/
 reports/
 plots/
+docs/results.md
 *.svg
 *.pdf
 *.pkl

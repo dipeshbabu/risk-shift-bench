@@ -5,8 +5,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from risk_preference_inference.blackjack import ACTIONS, DecisionState
-from risk_preference_inference.envs import RiskTask
-from risk_preference_inference.objectives import DistributionalObjective, MeanObjective, ObjectiveContext
+from risk_preference_inference.envs import STANDARD_DECK, RiskTask
+from risk_preference_inference.objectives import (
+    DistributionalObjective,
+    EntropicObjective,
+    MeanObjective,
+    OCEObjective,
+    ObjectiveContext,
+    TargetSeekingObjective,
+)
 from risk_preference_inference.return_distributions import action_bankroll_distribution
 
 
@@ -97,3 +104,59 @@ class BasicStrategyPolicy(BenchmarkPolicy):
         hit = total <= 11 or (total == 12 and dealer in (2, 3, 7, 8, 9, 10, 11)) or (13 <= total <= 16 and dealer >= 7)
         return {"stand": 0.0 if hit else 1.0, "hit": 1.0 if hit else 0.0}
 
+
+@dataclass(frozen=True)
+class RegimeAdaptivePolicy(BenchmarkPolicy):
+    """Switch between objective families using observable task regime features."""
+
+    name: str = "regime_adaptive_ensemble"
+    enable_deck_shift: bool = True
+    enable_ruin: bool = True
+    enable_drawdown: bool = True
+    enable_target: bool = True
+    require_target_regime: bool = True
+
+    def _card_mean(self, task: RiskTask) -> float:
+        return sum(card * prob for card, prob in task.card_probs)
+
+    def _standard_card_mean(self) -> float:
+        return sum(card * prob for card, prob in STANDARD_DECK)
+
+    def _delegate(
+        self,
+        state: DecisionState,
+        task: RiskTask,
+        rounds_remaining: int,
+        peak_bankroll: float | None,
+    ) -> BenchmarkPolicy:
+        target_gap = max(0.0, task.target_bankroll - state.current_bankroll)
+        shifted_deck = abs(self._card_mean(task) - self._standard_card_mean()) > 0.35
+        target_regime = task.rounds > 25 or not self.require_target_regime
+
+        if self.enable_deck_shift and shifted_deck:
+            return StaticObjectivePolicy(EntropicObjective(risk_aversion=0.025), name="regime_entropic_shift")
+        if self.enable_ruin and task.initial_bankroll <= 15.0 * task.bet:
+            return StaticObjectivePolicy(OCEObjective(shortfall_penalty=3.0), name="regime_oce_ruin")
+        if self.enable_drawdown and task.drawdown_limit <= 0.15:
+            return StaticObjectivePolicy(EntropicObjective(risk_aversion=0.01), name="regime_entropic_drawdown")
+        if self.enable_target and target_regime and (target_gap <= 6.0 * task.bet or rounds_remaining <= 10):
+            objective = TargetSeekingObjective(MeanObjective(), target_bonus=300.0)
+            return StaticObjectivePolicy(objective, name="regime_target_mean")
+        return BasicStrategyPolicy()
+
+    def action_probabilities(
+        self,
+        state: DecisionState,
+        task: RiskTask,
+        rounds_remaining: int,
+        hand_depth: int = 4,
+        peak_bankroll: float | None = None,
+    ) -> dict[str, float]:
+        delegate = self._delegate(state, task, rounds_remaining, peak_bankroll)
+        return delegate.action_probabilities(
+            state,
+            task=task,
+            rounds_remaining=rounds_remaining,
+            hand_depth=hand_depth,
+            peak_bankroll=peak_bankroll,
+        )

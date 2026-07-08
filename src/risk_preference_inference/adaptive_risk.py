@@ -8,7 +8,11 @@ from risk_preference_inference.objectives import (
     CVaRObjective,
     Distribution,
     DistributionalObjective,
+    EntropicObjective,
     ObjectiveContext,
+    expected_excess_above,
+    expected_shortfall_below,
+    mean,
     probability_at_or_above,
     probability_at_or_below,
 )
@@ -88,3 +92,74 @@ class LearnedAdaptiveCVaRObjective(DistributionalObjective):
         ruin_prob = probability_at_or_below(distribution, context.ruin_bankroll)
         target_prob = probability_at_or_above(distribution, context.target_bankroll)
         return base - self.ruin_penalty * ruin_prob + self.target_bonus * target_prob
+
+
+@dataclass(frozen=True)
+class AdaptiveUtilitySchedule:
+    """State-pressure gates for an adaptive utility objective."""
+
+    low_bankroll_ratio: float = 0.55
+    safe_bankroll_ratio: float = 1.15
+    drawdown_trigger: float = 0.12
+    target_window: float = 0.35
+    terminal_window: int = 8
+
+    def risk_pressure(self, context: ObjectiveContext) -> float:
+        bankroll_span = max(self.safe_bankroll_ratio - self.low_bankroll_ratio, 1e-9)
+        bankroll_pressure = (self.safe_bankroll_ratio - context.bankroll_ratio) / bankroll_span
+        drawdown_pressure = context.drawdown_fraction / max(self.drawdown_trigger, 1e-9)
+        return max(0.0, min(1.0, 0.65 * bankroll_pressure + 0.35 * drawdown_pressure))
+
+    def target_pressure(self, context: ObjectiveContext) -> float:
+        target_gap = context.target_gap_fraction / max(self.target_window, 1e-9)
+        proximity = 1.0 - max(0.0, min(1.0, target_gap))
+        terminal = 1.0 - max(0.0, min(1.0, context.rounds_remaining / max(self.terminal_window, 1)))
+        return max(0.0, min(1.0, 0.7 * proximity + 0.3 * terminal))
+
+
+@dataclass(frozen=True)
+class StateAdaptiveUtilityObjective(DistributionalObjective):
+    """Blend mean, CE, CVaR, and constraint probabilities using state pressure.
+
+    The objective is intentionally mean-seeking in safe states, then increases
+    risk penalties only near bankroll, ruin, or drawdown pressure. This avoids
+    the failure mode where a globally conservative CVaR schedule sacrifices
+    upside even when constraints are inactive.
+    """
+
+    schedule: AdaptiveUtilitySchedule = AdaptiveUtilitySchedule()
+    cvar_alpha: float = 0.2
+    entropic_eta: float = 0.01
+    risk_weight: float = 0.35
+    ruin_penalty: float = 400.0
+    drawdown_penalty: float = 0.35
+    target_bonus: float = 180.0
+    target_excess_weight: float = 0.15
+    name: str = "state_adaptive_utility"
+
+    def score(self, distribution: Distribution, context: ObjectiveContext) -> float:
+        mean_score = mean(distribution)
+        cvar_score = CVaRObjective(alpha=self.cvar_alpha).score(distribution, context)
+        entropic_score = EntropicObjective(risk_aversion=self.entropic_eta).score(distribution, context)
+        risk_pressure = self.schedule.risk_pressure(context)
+        target_pressure = self.schedule.target_pressure(context)
+
+        risk_adjusted = (
+            (1.0 - self.risk_weight * risk_pressure) * mean_score
+            + (self.risk_weight * risk_pressure * 0.55) * entropic_score
+            + (self.risk_weight * risk_pressure * 0.45) * cvar_score
+        )
+
+        ruin_prob = probability_at_or_below(distribution, context.ruin_bankroll)
+        target_prob = probability_at_or_above(distribution, context.target_bankroll)
+        drawdown_limit_bankroll = context.peak_bankroll - context.initial_bankroll * self.schedule.drawdown_trigger
+        drawdown_shortfall = expected_shortfall_below(distribution, drawdown_limit_bankroll)
+        target_excess = expected_excess_above(distribution, context.target_bankroll)
+
+        return (
+            risk_adjusted
+            - risk_pressure * self.ruin_penalty * ruin_prob
+            - risk_pressure * self.drawdown_penalty * drawdown_shortfall
+            + target_pressure * self.target_bonus * target_prob
+            + target_pressure * self.target_excess_weight * target_excess
+        )
