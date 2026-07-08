@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from risk_preference_inference.blackjack import ACTIONS, DecisionState
 from risk_preference_inference.envs import STANDARD_DECK, RiskTask
@@ -150,6 +150,77 @@ class RegimeAdaptivePolicy(BenchmarkPolicy):
             objective = TargetSeekingObjective(MeanObjective(), target_bonus=300.0)
             return StaticObjectivePolicy(objective, name="regime_target_mean")
         return BasicStrategyPolicy()
+
+    def action_probabilities(
+        self,
+        state: DecisionState,
+        task: RiskTask,
+        rounds_remaining: int,
+        hand_depth: int = 4,
+        peak_bankroll: float | None = None,
+    ) -> dict[str, float]:
+        delegate = self._delegate(state, task, rounds_remaining, peak_bankroll)
+        return delegate.action_probabilities(
+            state,
+            task=task,
+            rounds_remaining=rounds_remaining,
+            hand_depth=hand_depth,
+            peak_bankroll=peak_bankroll,
+        )
+
+
+@dataclass(frozen=True)
+class SignedRegimeAdaptivePolicy(BenchmarkPolicy):
+    """Regime controller with signed deck gates and pluggable delegates."""
+
+    name: str = "signed_regime_learned_ensemble"
+    positive_shift_threshold: float = 0.35
+    negative_shift_threshold: float = -0.35
+    require_target_regime: bool = True
+    mean_delegate: BenchmarkPolicy = field(default_factory=BasicStrategyPolicy)
+    ruin_delegate: BenchmarkPolicy = field(
+        default_factory=lambda: StaticObjectivePolicy(OCEObjective(shortfall_penalty=3.0), name="signed_ruin_oce")
+    )
+    target_delegate: BenchmarkPolicy = field(
+        default_factory=lambda: StaticObjectivePolicy(EntropicObjective(risk_aversion=0.025), name="signed_target_entropic")
+    )
+    drawdown_delegate: BenchmarkPolicy = field(
+        default_factory=lambda: StaticObjectivePolicy(EntropicObjective(risk_aversion=0.01), name="signed_drawdown_entropic")
+    )
+    high_shift_delegate: BenchmarkPolicy = field(
+        default_factory=lambda: StaticObjectivePolicy(EntropicObjective(risk_aversion=0.025), name="signed_high_entropic")
+    )
+    low_shift_delegate: BenchmarkPolicy = field(
+        default_factory=lambda: StaticObjectivePolicy(OCEObjective(shortfall_penalty=3.0), name="signed_low_oce")
+    )
+
+    def _card_mean(self, task: RiskTask) -> float:
+        return sum(card * prob for card, prob in task.card_probs)
+
+    def _standard_card_mean(self) -> float:
+        return sum(card * prob for card, prob in STANDARD_DECK)
+
+    def _delegate(
+        self,
+        state: DecisionState,
+        task: RiskTask,
+        rounds_remaining: int,
+        peak_bankroll: float | None,
+    ) -> BenchmarkPolicy:
+        mean_shift = self._card_mean(task) - self._standard_card_mean()
+        target_regime = task.rounds > 25 or not self.require_target_regime
+
+        if mean_shift >= self.positive_shift_threshold:
+            return self.high_shift_delegate
+        if mean_shift <= self.negative_shift_threshold:
+            return self.low_shift_delegate
+        if task.initial_bankroll <= 15.0 * task.bet:
+            return self.ruin_delegate
+        if task.drawdown_limit <= 0.15:
+            return self.drawdown_delegate
+        if target_regime:
+            return self.target_delegate
+        return self.mean_delegate
 
     def action_probabilities(
         self,

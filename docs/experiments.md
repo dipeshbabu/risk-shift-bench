@@ -69,7 +69,8 @@ uv run python -m experiments.multiseed_evaluation \
 The command writes `seed_task_scores.csv`, `aggregate_scores.csv`,
 `paired_deltas.csv`, and `summary.json`. Use `--input-scores` with an existing
 `seed_task_scores.csv` file to regenerate the aggregate and paired tables
-without rerunning simulation.
+without rerunning simulation. The paired-delta reference defaults to
+`signed_regime_learned_ensemble` and can be changed with `--reference-policy`.
 
 Statistical report:
 

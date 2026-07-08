@@ -13,6 +13,7 @@ from risk_preference_inference.policy_registry import (
     learned_adaptive_cvar_policy,
     learned_mixture_policy,
     searched_learned_mixture_policy,
+    signed_regime_learned_policy,
     state_adaptive_utility_policy,
     strong_baseline_grid,
 )
@@ -120,6 +121,19 @@ class SmokeTests(unittest.TestCase):
         probs = searched_learned_mixture_policy().action_probabilities(state, task, rounds_remaining=2, hand_depth=1)
         self.assertEqual(set(probs), {"hit", "stand"})
 
+    def test_signed_regime_learned_policy_scores(self):
+        task = RiskTask(name="signed-regime-test", rounds=2, initial_bankroll=120, target_bankroll=150)
+        state = DecisionState((10, 6), 10, current_bankroll=120, initial_bankroll=120, target_bankroll=150)
+        probs = signed_regime_learned_policy().action_probabilities(state, task, rounds_remaining=2, hand_depth=1)
+        self.assertEqual(set(probs), {"hit", "stand"})
+
+    def test_signed_regime_uses_learned_delegate_for_target_task(self):
+        task = RiskTask(name="target-regime", rounds=30, initial_bankroll=500, target_bankroll=640)
+        state = DecisionState((10, 6), 10, current_bankroll=500, initial_bankroll=500, target_bankroll=640)
+        policy = signed_regime_learned_policy()
+        delegate = policy._delegate(state, task, rounds_remaining=30, peak_bankroll=500)
+        self.assertIn("learned_delegate", delegate.name)
+
     def test_state_adaptive_utility_search_runs(self):
         train_task = RiskTask(name="utility-train", rounds=2, initial_bankroll=120, target_bankroll=150)
         test_task = RiskTask(name="utility-test", rounds=2, initial_bankroll=120, target_bankroll=150)
@@ -169,6 +183,7 @@ class SmokeTests(unittest.TestCase):
         self.assertTrue(rows)
         self.assertTrue(aggregate)
         self.assertTrue(paired_deltas)
+        self.assertTrue(all(row["reference_policy"] == "signed_regime_learned_ensemble" for row in paired_deltas))
 
     def test_paired_policy_deltas_compare_same_task_seed_cells(self):
         rows = [

@@ -12,6 +12,7 @@ from risk_preference_inference.policy_registry import (
     adaptive_cvar_policy,
     learned_mixture_policy,
     searched_learned_mixture_policy,
+    signed_regime_learned_policy,
     state_adaptive_utility_policy,
 )
 from risk_preference_inference.envs import RiskTask
@@ -39,6 +40,7 @@ def ablation_policies() -> list[BenchmarkPolicy]:
             name="learned_mixture_shift_target",
         ),
         searched_learned_mixture_policy(),
+        signed_regime_learned_policy(),
         RegimeAdaptivePolicy(name="regime_full"),
         RegimeAdaptivePolicy(name="ablate_deck_shift", enable_deck_shift=False),
         RegimeAdaptivePolicy(name="ablate_ruin_branch", enable_ruin=False),

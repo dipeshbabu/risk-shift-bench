@@ -20,7 +20,13 @@ from risk_preference_inference.objectives import (
     RuinConstrainedObjective,
     TargetSeekingObjective,
 )
-from risk_preference_inference.policies import BasicStrategyPolicy, BenchmarkPolicy, RegimeAdaptivePolicy, StaticObjectivePolicy
+from risk_preference_inference.policies import (
+    BasicStrategyPolicy,
+    BenchmarkPolicy,
+    RegimeAdaptivePolicy,
+    SignedRegimeAdaptivePolicy,
+    StaticObjectivePolicy,
+)
 
 
 def adaptive_cvar_policy(
@@ -196,6 +202,18 @@ def searched_learned_mixture_policy(name: str = "learned_mixture_searched") -> B
     )
 
 
+def signed_regime_learned_policy(name: str = "signed_regime_learned_ensemble") -> BenchmarkPolicy:
+    learned_delegate = searched_learned_mixture_policy(name=f"{name}_learned_delegate")
+    return SignedRegimeAdaptivePolicy(
+        name=name,
+        ruin_delegate=StaticObjectivePolicy(OCEObjective(shortfall_penalty=3.0), name=f"{name}_ruin_oce"),
+        low_shift_delegate=StaticObjectivePolicy(EntropicObjective(risk_aversion=0.025), name=f"{name}_low_entropic"),
+        target_delegate=learned_delegate,
+        drawdown_delegate=StaticObjectivePolicy(EntropicObjective(risk_aversion=0.01), name=f"{name}_drawdown_entropic"),
+        high_shift_delegate=StaticObjectivePolicy(EntropicObjective(risk_aversion=0.025), name=f"{name}_high_entropic"),
+    )
+
+
 def core_policies() -> list[BenchmarkPolicy]:
     return [
         BasicStrategyPolicy(),
@@ -210,6 +228,7 @@ def core_policies() -> list[BenchmarkPolicy]:
         learned_mixture_policy(name="learned_mixture"),
         searched_learned_mixture_policy(),
         RegimeAdaptivePolicy(),
+        signed_regime_learned_policy(),
     ]
 
 
@@ -256,4 +275,5 @@ def strong_baseline_grid() -> list[BenchmarkPolicy]:
     )
     policies.append(searched_learned_mixture_policy())
     policies.append(RegimeAdaptivePolicy())
+    policies.append(signed_regime_learned_policy())
     return policies

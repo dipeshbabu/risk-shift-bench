@@ -130,7 +130,7 @@ uv run python -m experiments.multiseed_evaluation --config configs/benchmark_ful
 ```
 
 This writes per seed/task scores, aggregate scores, and paired deltas against
-`learned_mixture_searched`.
+`signed_regime_learned_ensemble` by default.
 
 Export exact small-horizon final-bankroll distributions:
 
@@ -187,6 +187,7 @@ The default benchmark compares:
 - `learned_mixture`
 - `learned_mixture_searched`
 - `regime_adaptive_ensemble`
+- `signed_regime_learned_ensemble`
 
 The key comparison is static risk objectives versus state-adaptive risk
 objectives under changing bankroll and task constraints.

@@ -13,6 +13,7 @@ from risk_preference_inference.policies import BasicStrategyPolicy, BenchmarkPol
 from risk_preference_inference.policy_registry import (
     adaptive_cvar_policy,
     searched_learned_mixture_policy,
+    signed_regime_learned_policy,
     state_adaptive_utility_policy,
 )
 
@@ -27,6 +28,7 @@ def multiseed_policies() -> list[BenchmarkPolicy]:
         state_adaptive_utility_policy(name="adaptive_utility_default"),
         searched_learned_mixture_policy(),
         RegimeAdaptivePolicy(),
+        signed_regime_learned_policy(),
     ]
 
 
@@ -119,6 +121,7 @@ def run_multiseed_evaluation(
     seeds: list[int],
     episodes: int,
     hand_depth: int,
+    reference_policy: str = "signed_regime_learned_ensemble",
 ) -> tuple[list[dict], list[dict], list[dict]]:
     rows = []
     for seed in seeds:
@@ -130,4 +133,4 @@ def run_multiseed_evaluation(
             hand_depth=hand_depth,
         )
         rows.extend(summarize_seed(seed, summaries))
-    return rows, aggregate_seed_scores(rows), paired_policy_deltas(rows)
+    return rows, aggregate_seed_scores(rows), paired_policy_deltas(rows, reference_policy=reference_policy)

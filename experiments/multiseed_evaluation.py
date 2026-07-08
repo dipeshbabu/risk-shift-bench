@@ -62,6 +62,7 @@ def main() -> None:
     parser.add_argument("--tasks", nargs="*", default=None)
     parser.add_argument("--out-dir", default="artifacts/multiseed")
     parser.add_argument("--input-scores", default=None)
+    parser.add_argument("--reference-policy", default="signed_regime_learned_ensemble")
     args = parser.parse_args()
 
     config = load_benchmark_config(args.config)
@@ -73,13 +74,14 @@ def main() -> None:
     if args.input_scores:
         rows = read_csv(Path(args.input_scores))
         aggregate = aggregate_seed_scores(rows)
-        paired_deltas = paired_policy_deltas(rows)
+        paired_deltas = paired_policy_deltas(rows, reference_policy=args.reference_policy)
     else:
         rows, aggregate, paired_deltas = run_multiseed_evaluation(
             tasks=tasks,
             seeds=seeds,
             episodes=episodes,
             hand_depth=hand_depth,
+            reference_policy=args.reference_policy,
         )
 
     out_dir = Path(args.out_dir)
