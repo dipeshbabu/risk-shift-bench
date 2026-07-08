@@ -8,7 +8,12 @@ from risk_preference_inference.adaptive_search import summary_score
 from risk_preference_inference.benchmark import BenchmarkSummary, run_benchmark
 from risk_preference_inference.objectives import EntropicObjective, MeanObjective, OCEObjective
 from risk_preference_inference.policies import BenchmarkPolicy, RegimeAdaptivePolicy, StaticObjectivePolicy
-from risk_preference_inference.policy_registry import adaptive_cvar_policy, learned_mixture_policy, state_adaptive_utility_policy
+from risk_preference_inference.policy_registry import (
+    adaptive_cvar_policy,
+    learned_mixture_policy,
+    searched_learned_mixture_policy,
+    state_adaptive_utility_policy,
+)
 from risk_preference_inference.envs import RiskTask
 
 
@@ -33,6 +38,7 @@ def ablation_policies() -> list[BenchmarkPolicy]:
             target_excess_weight=0.25,
             name="learned_mixture_shift_target",
         ),
+        searched_learned_mixture_policy(),
         RegimeAdaptivePolicy(name="regime_full"),
         RegimeAdaptivePolicy(name="ablate_deck_shift", enable_deck_shift=False),
         RegimeAdaptivePolicy(name="ablate_ruin_branch", enable_ruin=False),

@@ -171,6 +171,31 @@ def learned_mixture_policy(
     return StaticObjectivePolicy(objective, name=policy_name)
 
 
+def searched_learned_mixture_policy(name: str = "learned_mixture_searched") -> BenchmarkPolicy:
+    return learned_mixture_policy(
+        risk_intercept=0.0,
+        bankroll_weight=0.25,
+        drawdown_weight=0.5,
+        deck_shift_weight=0.5,
+        target_intercept=0.0,
+        target_gap_weight=0.75,
+        terminal_weight=0.25,
+        terminal_window=8,
+        cvar_alpha=0.15,
+        entropic_eta=0.01,
+        oce_penalty=3.0,
+        entropic_weight=0.35,
+        cvar_weight=0.05,
+        oce_weight=0.15,
+        deck_entropic_weight=1.25,
+        ruin_penalty=250.0,
+        drawdown_penalty=0.1,
+        target_bonus=350.0,
+        target_excess_weight=0.15,
+        name=name,
+    )
+
+
 def core_policies() -> list[BenchmarkPolicy]:
     return [
         BasicStrategyPolicy(),
@@ -183,6 +208,7 @@ def core_policies() -> list[BenchmarkPolicy]:
         adaptive_cvar_policy(name="adaptive_cvar"),
         state_adaptive_utility_policy(name="state_adaptive_utility"),
         learned_mixture_policy(name="learned_mixture"),
+        searched_learned_mixture_policy(),
         RegimeAdaptivePolicy(),
     ]
 
@@ -228,5 +254,6 @@ def strong_baseline_grid() -> list[BenchmarkPolicy]:
             name="learned_mixture_shift_target",
         )
     )
+    policies.append(searched_learned_mixture_policy())
     policies.append(RegimeAdaptivePolicy())
     return policies

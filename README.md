@@ -26,6 +26,7 @@ distribution-shift constraints.
 - `risk_preference_inference.active_query`: disagreement-based state selection for data collection.
 - `risk_preference_inference.synthetic`: synthetic decision data generation.
 - `risk_preference_inference.statistics`: bootstrap confidence intervals and paired policy comparisons.
+- `risk_preference_inference.multiseed`: seed-level policy comparisons for higher-confidence evaluations.
 - `risk_preference_inference.toy_envs`: non-Blackjack toy risk tasks.
 
 ## Basic Usage
@@ -122,6 +123,15 @@ Run branch-level ablations for the regime-adaptive ensemble:
 uv run python -m experiments.ablation_study --config configs/benchmark_full.json
 ```
 
+Run seed-level policy comparisons:
+
+```bash
+uv run python -m experiments.multiseed_evaluation --config configs/benchmark_full.json
+```
+
+This writes per seed/task scores, aggregate scores, and paired deltas against
+`learned_mixture_searched`.
+
 Export exact small-horizon final-bankroll distributions:
 
 ```bash
@@ -175,6 +185,7 @@ The default benchmark compares:
 - `adaptive_cvar`
 - `state_adaptive_utility`
 - `learned_mixture`
+- `learned_mixture_searched`
 - `regime_adaptive_ensemble`
 
 The key comparison is static risk objectives versus state-adaptive risk

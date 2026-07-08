@@ -57,6 +57,20 @@ uv run python -m experiments.ablation_study --config configs/benchmark_full.json
 The ablation artifact reports aggregate scores, per-task scores, and raw
 summary metrics for branch-disabled variants of the regime-adaptive ensemble.
 
+Multi-seed evaluation:
+
+```bash
+uv run python -m experiments.multiseed_evaluation \
+  --config configs/benchmark_full.json \
+  --seeds 0,1,2,3,4 \
+  --episodes 300
+```
+
+The command writes `seed_task_scores.csv`, `aggregate_scores.csv`,
+`paired_deltas.csv`, and `summary.json`. Use `--input-scores` with an existing
+`seed_task_scores.csv` file to regenerate the aggregate and paired tables
+without rerunning simulation.
+
 Statistical report:
 
 ```bash

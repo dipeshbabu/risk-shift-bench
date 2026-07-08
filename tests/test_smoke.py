@@ -12,11 +12,13 @@ from risk_preference_inference.policy_registry import (
     core_policies,
     learned_adaptive_cvar_policy,
     learned_mixture_policy,
+    searched_learned_mixture_policy,
     state_adaptive_utility_policy,
     strong_baseline_grid,
 )
 from risk_preference_inference.adaptive_search import search_adaptive_utility_policy, search_learned_mixture_policy
 from risk_preference_inference.ablations import run_ablation_study
+from risk_preference_inference.multiseed import paired_policy_deltas, run_multiseed_evaluation
 from risk_preference_inference.toy_envs import run_toy_benchmark
 from risk_preference_inference.run_management import paper_run_paths, required_artifacts
 from risk_preference_inference.policy import action_probabilities
@@ -112,6 +114,12 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(set(probs), {"hit", "stand"})
         self.assertLess(abs(sum(probs.values()) - 1.0), 1e-9)
 
+    def test_searched_learned_mixture_policy_scores(self):
+        task = RiskTask(name="searched-mixture-test", rounds=2, initial_bankroll=120, target_bankroll=150)
+        state = DecisionState((10, 6), 10, current_bankroll=120, initial_bankroll=120, target_bankroll=150)
+        probs = searched_learned_mixture_policy().action_probabilities(state, task, rounds_remaining=2, hand_depth=1)
+        self.assertEqual(set(probs), {"hit", "stand"})
+
     def test_state_adaptive_utility_search_runs(self):
         train_task = RiskTask(name="utility-train", rounds=2, initial_bankroll=120, target_bankroll=150)
         test_task = RiskTask(name="utility-test", rounds=2, initial_bankroll=120, target_bankroll=150)
@@ -149,6 +157,29 @@ class SmokeTests(unittest.TestCase):
         self.assertTrue(summaries)
         self.assertTrue(aggregate_scores)
         self.assertTrue(task_scores)
+
+    def test_multiseed_evaluation_runs(self):
+        task = RiskTask(name="multiseed-test", rounds=2, initial_bankroll=120, target_bankroll=150)
+        rows, aggregate, paired_deltas = run_multiseed_evaluation(
+            tasks=[task],
+            seeds=[0, 1],
+            episodes=1,
+            hand_depth=1,
+        )
+        self.assertTrue(rows)
+        self.assertTrue(aggregate)
+        self.assertTrue(paired_deltas)
+
+    def test_paired_policy_deltas_compare_same_task_seed_cells(self):
+        rows = [
+            {"task": "a", "seed": 0, "policy": "ref", "score": 3.0},
+            {"task": "a", "seed": 0, "policy": "base", "score": 1.0},
+            {"task": "a", "seed": 1, "policy": "ref", "score": 2.0},
+            {"task": "a", "seed": 1, "policy": "base", "score": 4.0},
+        ]
+        deltas = paired_policy_deltas(rows, reference_policy="ref")
+        self.assertEqual(deltas[0]["n_pairs"], 2)
+        self.assertEqual(deltas[0]["mean_delta"], 0.0)
 
     def test_regime_adaptive_policy_scores(self):
         task = RiskTask(name="regime-test", rounds=2, initial_bankroll=120, target_bankroll=150)
