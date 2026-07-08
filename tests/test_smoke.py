@@ -11,10 +11,11 @@ from risk_preference_inference.objectives import mean
 from risk_preference_inference.policy_registry import (
     core_policies,
     learned_adaptive_cvar_policy,
+    learned_mixture_policy,
     state_adaptive_utility_policy,
     strong_baseline_grid,
 )
-from risk_preference_inference.adaptive_search import search_adaptive_utility_policy
+from risk_preference_inference.adaptive_search import search_adaptive_utility_policy, search_learned_mixture_policy
 from risk_preference_inference.ablations import run_ablation_study
 from risk_preference_inference.toy_envs import run_toy_benchmark
 from risk_preference_inference.run_management import paper_run_paths, required_artifacts
@@ -104,6 +105,13 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(set(probs), {"hit", "stand"})
         self.assertLess(abs(sum(probs.values()) - 1.0), 1e-9)
 
+    def test_learned_mixture_policy_scores(self):
+        task = RiskTask(name="mixture-test", rounds=2, initial_bankroll=120, target_bankroll=150)
+        state = DecisionState((10, 6), 10, current_bankroll=120, initial_bankroll=120, target_bankroll=150)
+        probs = learned_mixture_policy().action_probabilities(state, task, rounds_remaining=2, hand_depth=1)
+        self.assertEqual(set(probs), {"hit", "stand"})
+        self.assertLess(abs(sum(probs.values()) - 1.0), 1e-9)
+
     def test_state_adaptive_utility_search_runs(self):
         train_task = RiskTask(name="utility-train", rounds=2, initial_bankroll=120, target_bankroll=150)
         test_task = RiskTask(name="utility-test", rounds=2, initial_bankroll=120, target_bankroll=150)
@@ -112,6 +120,19 @@ class SmokeTests(unittest.TestCase):
             test_tasks=[test_task],
             episodes=2,
             seed=4,
+            hand_depth=1,
+            smoke=True,
+        )
+        self.assertTrue(result.test_summaries)
+
+    def test_learned_mixture_search_runs(self):
+        train_task = RiskTask(name="mixture-train", rounds=2, initial_bankroll=120, target_bankroll=150)
+        test_task = RiskTask(name="mixture-test", rounds=2, initial_bankroll=120, target_bankroll=150)
+        result = search_learned_mixture_policy(
+            train_tasks=[train_task],
+            test_tasks=[test_task],
+            episodes=2,
+            seed=6,
             hand_depth=1,
             smoke=True,
         )

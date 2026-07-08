@@ -8,7 +8,7 @@ from risk_preference_inference.adaptive_search import summary_score
 from risk_preference_inference.benchmark import BenchmarkSummary, run_benchmark
 from risk_preference_inference.objectives import EntropicObjective, MeanObjective, OCEObjective
 from risk_preference_inference.policies import BenchmarkPolicy, RegimeAdaptivePolicy, StaticObjectivePolicy
-from risk_preference_inference.policy_registry import adaptive_cvar_policy, state_adaptive_utility_policy
+from risk_preference_inference.policy_registry import adaptive_cvar_policy, learned_mixture_policy, state_adaptive_utility_policy
 from risk_preference_inference.envs import RiskTask
 
 
@@ -19,6 +19,20 @@ def ablation_policies() -> list[BenchmarkPolicy]:
         StaticObjectivePolicy(OCEObjective(shortfall_penalty=3.0), name="fixed_oce_3"),
         adaptive_cvar_policy(name="naive_adaptive_cvar"),
         state_adaptive_utility_policy(name="no_regime_switch_adaptive_utility"),
+        learned_mixture_policy(name="learned_mixture_default"),
+        learned_mixture_policy(
+            risk_intercept=0.0,
+            bankroll_weight=0.25,
+            drawdown_weight=0.35,
+            deck_shift_weight=0.75,
+            entropic_weight=0.25,
+            cvar_weight=0.05,
+            oce_weight=0.15,
+            deck_entropic_weight=1.0,
+            target_bonus=350.0,
+            target_excess_weight=0.25,
+            name="learned_mixture_shift_target",
+        ),
         RegimeAdaptivePolicy(name="regime_full"),
         RegimeAdaptivePolicy(name="ablate_deck_shift", enable_deck_shift=False),
         RegimeAdaptivePolicy(name="ablate_ruin_branch", enable_ruin=False),

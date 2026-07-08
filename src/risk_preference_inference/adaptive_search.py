@@ -8,7 +8,12 @@ from itertools import product
 
 from risk_preference_inference.benchmark import BenchmarkSummary, run_benchmark
 from risk_preference_inference.envs import RiskTask
-from risk_preference_inference.policy_registry import adaptive_cvar_policy, state_adaptive_utility_policy, strong_baseline_grid
+from risk_preference_inference.policy_registry import (
+    adaptive_cvar_policy,
+    learned_mixture_policy,
+    state_adaptive_utility_policy,
+    strong_baseline_grid,
+)
 
 
 @dataclass(frozen=True)
@@ -49,6 +54,38 @@ class AdaptiveUtilityParams:
 @dataclass(frozen=True)
 class UtilitySearchResult:
     params: AdaptiveUtilityParams
+    train_score: float
+    test_score: float
+    train_summaries: list[dict]
+    test_summaries: list[dict]
+
+
+@dataclass(frozen=True)
+class MixtureParams:
+    risk_intercept: float
+    bankroll_weight: float
+    drawdown_weight: float
+    deck_shift_weight: float
+    target_intercept: float
+    target_gap_weight: float
+    terminal_weight: float
+    terminal_window: int
+    cvar_alpha: float
+    entropic_eta: float
+    oce_penalty: float
+    entropic_weight: float
+    cvar_weight: float
+    oce_weight: float
+    deck_entropic_weight: float
+    ruin_penalty: float
+    drawdown_penalty: float
+    target_bonus: float
+    target_excess_weight: float
+
+
+@dataclass(frozen=True)
+class MixtureSearchResult:
+    params: MixtureParams
     train_score: float
     test_score: float
     train_summaries: list[dict]
@@ -98,6 +135,38 @@ def utility_candidate_params(smoke: bool = False) -> list[AdaptiveUtilityParams]
             (0.05, 0.25),
         )
         if values[0] < values[1]
+    ]
+
+
+def mixture_candidate_params(smoke: bool = False) -> list[MixtureParams]:
+    if smoke:
+        return [
+            MixtureParams(0.0, 0.5, 0.5, 0.5, 0.0, 0.75, 0.25, 10, 0.25, 0.025, 3.0, 0.4, 0.1, 0.25, 0.75, 250.0, 0.15, 250.0, 0.15),
+            MixtureParams(0.0, 0.25, 0.35, 0.75, 0.0, 0.75, 0.25, 10, 0.25, 0.025, 3.0, 0.25, 0.05, 0.15, 1.0, 250.0, 0.10, 350.0, 0.25),
+        ]
+    return [
+        MixtureParams(*values)
+        for values in product(
+            (0.0, 0.1),
+            (0.25, 0.5),
+            (0.25, 0.5),
+            (0.5, 0.9),
+            (0.0,),
+            (0.75,),
+            (0.25,),
+            (8, 12),
+            (0.15, 0.3),
+            (0.01, 0.025),
+            (3.0,),
+            (0.15, 0.35),
+            (0.05,),
+            (0.15,),
+            (0.75, 1.25),
+            (250.0,),
+            (0.10,),
+            (150.0, 350.0),
+            (0.15,),
+        )
     ]
 
 
@@ -160,6 +229,18 @@ def evaluate_utility_params(
     hand_depth: int,
 ) -> tuple[float, list[BenchmarkSummary]]:
     policy = state_adaptive_utility_policy(**asdict(params))
+    _, summaries = run_benchmark(tasks=tasks, policies=[policy], episodes=episodes, seed=seed, hand_depth=hand_depth)
+    return aggregate_score(summaries), summaries
+
+
+def evaluate_mixture_params(
+    params: MixtureParams,
+    tasks: list[RiskTask],
+    episodes: int,
+    seed: int,
+    hand_depth: int,
+) -> tuple[float, list[BenchmarkSummary]]:
+    policy = learned_mixture_policy(**asdict(params))
     _, summaries = run_benchmark(tasks=tasks, policies=[policy], episodes=episodes, seed=seed, hand_depth=hand_depth)
     return aggregate_score(summaries), summaries
 
@@ -228,6 +309,42 @@ def search_adaptive_utility_policy(
         raise RuntimeError("no adaptive utility candidates were evaluated")
     test_score, test_summaries = evaluate_utility_params(best_params, test_tasks, episodes, seed + 199_000, hand_depth)
     return UtilitySearchResult(
+        params=best_params,
+        train_score=best_train_score,
+        test_score=test_score,
+        train_summaries=[asdict(summary) for summary in best_train_summaries],
+        test_summaries=[asdict(summary) for summary in test_summaries],
+    )
+
+
+def search_learned_mixture_policy(
+    train_tasks: list[RiskTask],
+    test_tasks: list[RiskTask],
+    episodes: int = 100,
+    seed: int = 0,
+    hand_depth: int = 3,
+    smoke: bool = False,
+    max_candidates: int | None = None,
+) -> MixtureSearchResult:
+    best_params: MixtureParams | None = None
+    best_train_score = float("-inf")
+    best_train_summaries: list[BenchmarkSummary] = []
+    candidates = mixture_candidate_params(smoke=smoke)
+    if max_candidates is not None and len(candidates) > max_candidates:
+        rng = random.Random(seed)
+        rng.shuffle(candidates)
+        candidates = candidates[:max_candidates]
+    for idx, params in enumerate(candidates):
+        score, summaries = evaluate_mixture_params(params, train_tasks, episodes, seed + idx * 4000, hand_depth)
+        if score > best_train_score:
+            best_train_score = score
+            best_params = params
+            best_train_summaries = summaries
+
+    if best_params is None:
+        raise RuntimeError("no learned mixture candidates were evaluated")
+    test_score, test_summaries = evaluate_mixture_params(best_params, test_tasks, episodes, seed + 299_000, hand_depth)
+    return MixtureSearchResult(
         params=best_params,
         train_score=best_train_score,
         test_score=test_score,

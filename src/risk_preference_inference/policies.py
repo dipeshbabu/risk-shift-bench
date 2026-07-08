@@ -39,6 +39,9 @@ class StaticObjectivePolicy(BenchmarkPolicy):
 
     def context(self, state: DecisionState, task: RiskTask, rounds_remaining: int, peak_bankroll: float | None) -> ObjectiveContext:
         peak = state.current_bankroll if peak_bankroll is None else max(peak_bankroll, state.current_bankroll)
+        standard_card_mean = sum(card * prob for card, prob in STANDARD_DECK)
+        task_card_mean = sum(card * prob for card, prob in task.card_probs)
+        high_card_mass = sum(prob for card, prob in task.card_probs if card >= 10)
         return ObjectiveContext(
             bankroll=state.current_bankroll,
             initial_bankroll=task.initial_bankroll,
@@ -46,6 +49,10 @@ class StaticObjectivePolicy(BenchmarkPolicy):
             target_bankroll=task.target_bankroll,
             peak_bankroll=peak,
             rounds_remaining=rounds_remaining,
+            bet=task.bet,
+            drawdown_limit=task.drawdown_limit,
+            card_mean_shift=task_card_mean - standard_card_mean,
+            high_card_mass=high_card_mass,
         )
 
     def action_scores(

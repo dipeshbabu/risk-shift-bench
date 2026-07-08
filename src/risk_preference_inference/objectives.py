@@ -76,6 +76,10 @@ class ObjectiveContext:
     target_bankroll: float
     peak_bankroll: float
     rounds_remaining: int
+    bet: float = 20.0
+    drawdown_limit: float = 0.25
+    card_mean_shift: float = 0.0
+    high_card_mass: float = 0.0
 
     @property
     def bankroll_ratio(self) -> float:
@@ -88,6 +92,14 @@ class ObjectiveContext:
     @property
     def target_gap_fraction(self) -> float:
         return max(0.0, self.target_bankroll - self.bankroll) / max(self.initial_bankroll, 1.0)
+
+    @property
+    def bet_pressure(self) -> float:
+        return self.bet / max(self.bankroll, 1.0)
+
+    @property
+    def deck_shift_magnitude(self) -> float:
+        return abs(self.card_mean_shift)
 
 
 class DistributionalObjective:

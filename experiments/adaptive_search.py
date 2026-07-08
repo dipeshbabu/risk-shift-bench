@@ -11,6 +11,7 @@ from risk_preference_inference.adaptive_search import (
     policy_score_report,
     search_adaptive_policy,
     search_adaptive_utility_policy,
+    search_learned_mixture_policy,
 )
 from risk_preference_inference.config import load_adaptive_search_config
 from risk_preference_inference.envs import benchmark_tasks
@@ -65,6 +66,15 @@ def main() -> None:
         smoke=smoke,
         max_candidates=config.max_candidates,
     )
+    mixture_result = search_learned_mixture_policy(
+        train_tasks=train_tasks,
+        test_tasks=test_tasks,
+        episodes=config.episodes,
+        seed=config.seed + 425_000,
+        hand_depth=config.hand_depth,
+        smoke=smoke,
+        max_candidates=config.max_candidates,
+    )
     baseline_test = evaluate_strong_baselines(
         tasks=test_tasks,
         episodes=config.episodes,
@@ -76,6 +86,7 @@ def main() -> None:
         + result.test_summaries
         + learned_result.test_summaries
         + utility_result.test_summaries
+        + mixture_result.test_summaries
     )
 
     payload = {
@@ -83,6 +94,7 @@ def main() -> None:
         "best_adaptive": asdict(result),
         "best_learned_adaptive": asdict(learned_result),
         "best_adaptive_utility": asdict(utility_result),
+        "best_learned_mixture": asdict(mixture_result),
         "baseline_test_summaries": baseline_test,
         "test_score_report": policy_score_report(all_test_summaries),
     }
@@ -95,6 +107,8 @@ def main() -> None:
     print(f"best_learned_params={asdict(learned_result.params)}")
     print(f"best_adaptive_utility_test_score={utility_result.test_score:.3f}")
     print(f"best_adaptive_utility_params={asdict(utility_result.params)}")
+    print(f"best_learned_mixture_test_score={mixture_result.test_score:.3f}")
+    print(f"best_learned_mixture_params={asdict(mixture_result.params)}")
 
 
 if __name__ == "__main__":

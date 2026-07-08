@@ -9,6 +9,7 @@ from risk_preference_inference.objectives import (
     Distribution,
     DistributionalObjective,
     EntropicObjective,
+    OCEObjective,
     ObjectiveContext,
     expected_excess_above,
     expected_shortfall_below,
@@ -16,6 +17,10 @@ from risk_preference_inference.objectives import (
     probability_at_or_above,
     probability_at_or_below,
 )
+
+
+def _clamp01(value: float) -> float:
+    return max(0.0, min(1.0, value))
 
 
 @dataclass(frozen=True)
@@ -160,6 +165,94 @@ class StateAdaptiveUtilityObjective(DistributionalObjective):
             risk_adjusted
             - risk_pressure * self.ruin_penalty * ruin_prob
             - risk_pressure * self.drawdown_penalty * drawdown_shortfall
+            + target_pressure * self.target_bonus * target_prob
+            + target_pressure * self.target_excess_weight * target_excess
+        )
+
+
+@dataclass(frozen=True)
+class LearnedMixtureSchedule:
+    """Linear feature gates for objective-mixture weights."""
+
+    risk_intercept: float = 0.0
+    bankroll_weight: float = 0.5
+    drawdown_weight: float = 0.5
+    deck_shift_weight: float = 0.5
+    target_intercept: float = 0.0
+    target_gap_weight: float = 0.75
+    terminal_weight: float = 0.25
+    terminal_window: int = 10
+
+    def risk_pressure(self, context: ObjectiveContext) -> float:
+        bankroll_pressure = _clamp01((0.9 - context.bankroll_ratio) / 0.5)
+        drawdown_pressure = _clamp01(context.drawdown_fraction / max(context.drawdown_limit, 1e-9))
+        deck_pressure = _clamp01(context.deck_shift_magnitude / 1.25)
+        return _clamp01(
+            self.risk_intercept
+            + self.bankroll_weight * bankroll_pressure
+            + self.drawdown_weight * drawdown_pressure
+            + self.deck_shift_weight * deck_pressure
+        )
+
+    def target_pressure(self, context: ObjectiveContext) -> float:
+        target_gap = _clamp01(1.0 - context.target_gap_fraction / 0.35)
+        terminal = _clamp01(1.0 - context.rounds_remaining / max(self.terminal_window, 1))
+        return _clamp01(
+            self.target_intercept
+            + self.target_gap_weight * target_gap
+            + self.terminal_weight * terminal
+        )
+
+    def deck_pressure(self, context: ObjectiveContext) -> float:
+        return _clamp01(context.deck_shift_magnitude / 1.25)
+
+
+@dataclass(frozen=True)
+class LearnedMixtureObjective(DistributionalObjective):
+    """State-conditioned mixture of risk objectives and constraint terms."""
+
+    schedule: LearnedMixtureSchedule = LearnedMixtureSchedule()
+    cvar_alpha: float = 0.25
+    entropic_eta: float = 0.025
+    oce_penalty: float = 3.0
+    entropic_weight: float = 0.4
+    cvar_weight: float = 0.1
+    oce_weight: float = 0.25
+    deck_entropic_weight: float = 0.75
+    ruin_penalty: float = 250.0
+    drawdown_penalty: float = 0.15
+    target_bonus: float = 250.0
+    target_excess_weight: float = 0.15
+    name: str = "learned_mixture"
+
+    def score(self, distribution: Distribution, context: ObjectiveContext) -> float:
+        mean_score = mean(distribution)
+        entropic_score = EntropicObjective(risk_aversion=self.entropic_eta).score(distribution, context)
+        cvar_score = CVaRObjective(alpha=self.cvar_alpha).score(distribution, context)
+        oce_score = OCEObjective(shortfall_penalty=self.oce_penalty).score(distribution, context)
+
+        risk_pressure = self.schedule.risk_pressure(context)
+        target_pressure = self.schedule.target_pressure(context)
+        deck_pressure = self.schedule.deck_pressure(context)
+        ruin_pressure = _clamp01((12.0 * context.bet - context.bankroll) / max(12.0 * context.bet, 1.0))
+        drawdown_pressure = _clamp01(context.drawdown_fraction / max(context.drawdown_limit, 1e-9))
+
+        score = mean_score
+        score += risk_pressure * self.entropic_weight * (entropic_score - mean_score)
+        score += risk_pressure * self.cvar_weight * (cvar_score - mean_score)
+        score += max(risk_pressure, ruin_pressure) * self.oce_weight * (oce_score - mean_score)
+        score += deck_pressure * self.deck_entropic_weight * (entropic_score - mean_score)
+
+        ruin_prob = probability_at_or_below(distribution, context.ruin_bankroll)
+        target_prob = probability_at_or_above(distribution, context.target_bankroll)
+        drawdown_limit_bankroll = context.peak_bankroll - context.initial_bankroll * context.drawdown_limit
+        drawdown_shortfall = expected_shortfall_below(distribution, drawdown_limit_bankroll)
+        target_excess = expected_excess_above(distribution, context.target_bankroll)
+
+        return (
+            score
+            - max(risk_pressure, ruin_pressure) * self.ruin_penalty * ruin_prob
+            - drawdown_pressure * self.drawdown_penalty * drawdown_shortfall
             + target_pressure * self.target_bonus * target_prob
             + target_pressure * self.target_excess_weight * target_excess
         )

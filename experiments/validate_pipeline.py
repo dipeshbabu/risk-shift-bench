@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from risk_preference_inference.adaptive_search import candidate_params, utility_candidate_params
+from risk_preference_inference.adaptive_search import candidate_params, mixture_candidate_params, utility_candidate_params
 from risk_preference_inference.ablations import ablation_policies
 from risk_preference_inference.config import load_adaptive_search_config, load_benchmark_config
 from risk_preference_inference.envs import benchmark_tasks
@@ -41,9 +41,11 @@ def main() -> None:
 
     adaptive_candidates = len(candidate_params(smoke=False))
     utility_candidates = len(utility_candidate_params(smoke=False))
+    mixture_candidates = len(mixture_candidate_params(smoke=False))
     learned_candidates = len(linear_candidates(smoke=False))
     adaptive_evaluated = min(adaptive_candidates, adaptive_config.max_candidates or adaptive_candidates)
     utility_evaluated = min(utility_candidates, adaptive_config.max_candidates or utility_candidates)
+    mixture_evaluated = min(mixture_candidates, adaptive_config.max_candidates or mixture_candidates)
     learned_evaluated = min(learned_candidates, adaptive_config.max_candidates or learned_candidates)
 
     print("pipeline validation ok")
@@ -54,9 +56,11 @@ def main() -> None:
     print(f"ablation_episode_rollouts={ablation_rollouts}")
     print(f"adaptive_candidates_total={adaptive_candidates}")
     print(f"adaptive_utility_candidates_total={utility_candidates}")
+    print(f"learned_mixture_candidates_total={mixture_candidates}")
     print(f"learned_candidates_total={learned_candidates}")
     print(f"adaptive_candidates_evaluated={adaptive_evaluated}")
     print(f"adaptive_utility_candidates_evaluated={utility_evaluated}")
+    print(f"learned_mixture_candidates_evaluated={mixture_evaluated}")
     print(f"learned_candidates_evaluated={learned_evaluated}")
     print(f"benchmark_out={benchmark_config.out_dir}")
     print(f"adaptive_out={adaptive_config.out_dir}")

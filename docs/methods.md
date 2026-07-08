@@ -23,6 +23,24 @@ target_pressure = g(target_gap, rounds_remaining)
 action = argmax adaptive_utility(P(final_bankroll | state, action), context)
 ```
 
+The learned mixture policy uses the same action distributions but learns a
+continuous mixture of objective families:
+
+```text
+score =
+  mean
+  + risk_pressure(x) * [w_entropic * (entropic - mean)
+                      + w_cvar * (cvar - mean)
+                      + w_oce * (oce - mean)]
+  + deck_pressure(x) * w_deck * (entropic - mean)
+  - ruin_pressure(x) * ruin_penalty * P(ruin)
+  - drawdown_pressure(x) * drawdown_shortfall
+  + target_pressure(x) * target_bonus * P(target)
+```
+
+The feature vector `x` includes bankroll ratio, drawdown fraction, target gap,
+rounds remaining, bet pressure, drawdown limit, and deck-shift statistics.
+
 The benchmark also includes a regime-adaptive ensemble. It switches between
 objective families using observable task features: bankroll pressure, target
 gap, drawdown limit, and card-distribution shift.

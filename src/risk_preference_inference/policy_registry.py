@@ -6,6 +6,8 @@ from risk_preference_inference.adaptive_risk import (
     AdaptiveCVaRObjective,
     AdaptiveCVaRSchedule,
     AdaptiveUtilitySchedule,
+    LearnedMixtureObjective,
+    LearnedMixtureSchedule,
     LearnedAdaptiveCVaRObjective,
     LinearAdaptiveCVaRSchedule,
     StateAdaptiveUtilityObjective,
@@ -116,6 +118,59 @@ def state_adaptive_utility_policy(
     return StaticObjectivePolicy(objective, name=policy_name)
 
 
+def learned_mixture_policy(
+    risk_intercept: float = 0.0,
+    bankroll_weight: float = 0.5,
+    drawdown_weight: float = 0.5,
+    deck_shift_weight: float = 0.5,
+    target_intercept: float = 0.0,
+    target_gap_weight: float = 0.75,
+    terminal_weight: float = 0.25,
+    terminal_window: int = 10,
+    cvar_alpha: float = 0.25,
+    entropic_eta: float = 0.025,
+    oce_penalty: float = 3.0,
+    entropic_weight: float = 0.4,
+    cvar_weight: float = 0.1,
+    oce_weight: float = 0.25,
+    deck_entropic_weight: float = 0.75,
+    ruin_penalty: float = 250.0,
+    drawdown_penalty: float = 0.15,
+    target_bonus: float = 250.0,
+    target_excess_weight: float = 0.15,
+    name: str | None = None,
+) -> BenchmarkPolicy:
+    schedule = LearnedMixtureSchedule(
+        risk_intercept=risk_intercept,
+        bankroll_weight=bankroll_weight,
+        drawdown_weight=drawdown_weight,
+        deck_shift_weight=deck_shift_weight,
+        target_intercept=target_intercept,
+        target_gap_weight=target_gap_weight,
+        terminal_weight=terminal_weight,
+        terminal_window=terminal_window,
+    )
+    objective = LearnedMixtureObjective(
+        schedule=schedule,
+        cvar_alpha=cvar_alpha,
+        entropic_eta=entropic_eta,
+        oce_penalty=oce_penalty,
+        entropic_weight=entropic_weight,
+        cvar_weight=cvar_weight,
+        oce_weight=oce_weight,
+        deck_entropic_weight=deck_entropic_weight,
+        ruin_penalty=ruin_penalty,
+        drawdown_penalty=drawdown_penalty,
+        target_bonus=target_bonus,
+        target_excess_weight=target_excess_weight,
+    )
+    policy_name = name or (
+        f"learned_mixture_ew{entropic_weight:g}_"
+        f"dw{deck_entropic_weight:g}_tb{target_bonus:g}"
+    )
+    return StaticObjectivePolicy(objective, name=policy_name)
+
+
 def core_policies() -> list[BenchmarkPolicy]:
     return [
         BasicStrategyPolicy(),
@@ -127,6 +182,7 @@ def core_policies() -> list[BenchmarkPolicy]:
         StaticObjectivePolicy(TargetSeekingObjective(MeanObjective(), target_bonus=150.0), name="target_seeking_mean"),
         adaptive_cvar_policy(name="adaptive_cvar"),
         state_adaptive_utility_policy(name="state_adaptive_utility"),
+        learned_mixture_policy(name="learned_mixture"),
         RegimeAdaptivePolicy(),
     ]
 
@@ -154,6 +210,22 @@ def strong_baseline_grid() -> list[BenchmarkPolicy]:
             target_bonus=250.0,
             target_excess_weight=0.25,
             name="state_adaptive_utility_aggressive",
+        )
+    )
+    policies.append(learned_mixture_policy(name="learned_mixture_default"))
+    policies.append(
+        learned_mixture_policy(
+            risk_intercept=0.0,
+            bankroll_weight=0.25,
+            drawdown_weight=0.35,
+            deck_shift_weight=0.75,
+            entropic_weight=0.25,
+            cvar_weight=0.05,
+            oce_weight=0.15,
+            deck_entropic_weight=1.0,
+            target_bonus=350.0,
+            target_excess_weight=0.25,
+            name="learned_mixture_shift_target",
         )
     )
     policies.append(RegimeAdaptivePolicy())

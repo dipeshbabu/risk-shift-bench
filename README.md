@@ -13,7 +13,7 @@ distribution-shift constraints.
 
 - `risk_preference_inference.envs`: benchmark task definitions such as mean-return, ruin-constrained, target-reaching, drawdown, and shifted-deck regimes.
 - `risk_preference_inference.objectives`: mean, CVaR, entropic risk, OCE, ruin-constrained, and target-seeking distributional objectives.
-- `risk_preference_inference.adaptive_risk`: state-adaptive CVaR schedules, adaptive utility objectives, and constraint-aware risk gates.
+- `risk_preference_inference.adaptive_risk`: state-adaptive CVaR schedules, adaptive utility objectives, learned objective mixtures, and constraint-aware risk gates.
 - `risk_preference_inference.policies`: benchmark policies, including objective policies and a regime-adaptive ensemble.
 - `risk_preference_inference.return_distributions`: exact hand-level payoff and bankroll distributions under an infinite-deck model.
 - `risk_preference_inference.benchmark`: policy x task simulation and aggregate risk metrics.
@@ -174,6 +174,7 @@ The default benchmark compares:
 - `target_seeking_mean`
 - `adaptive_cvar`
 - `state_adaptive_utility`
+- `learned_mixture`
 - `regime_adaptive_ensemble`
 
 The key comparison is static risk objectives versus state-adaptive risk
