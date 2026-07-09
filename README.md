@@ -138,6 +138,9 @@ Search a target-specific branch for the signed ensemble:
 uv run python -m experiments.target_branch_search
 ```
 
+The search reports a promotion gate before any candidate should replace the
+current signed-ensemble target delegate.
+
 Export exact small-horizon final-bankroll distributions:
 
 ```bash

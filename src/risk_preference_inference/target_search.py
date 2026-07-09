@@ -10,7 +10,7 @@ from risk_preference_inference.adaptive_search import summary_score
 from risk_preference_inference.benchmark import BenchmarkSummary, run_benchmark
 from risk_preference_inference.envs import RiskTask
 from risk_preference_inference.objectives import EntropicObjective, MeanObjective, OCEObjective, TargetSeekingObjective
-from risk_preference_inference.policies import BasicStrategyPolicy, BenchmarkPolicy, StaticObjectivePolicy
+from risk_preference_inference.policies import BasicStrategyPolicy, BenchmarkPolicy, SignedRegimeAdaptivePolicy, StaticObjectivePolicy
 from risk_preference_inference.policy_registry import (
     learned_mixture_policy,
     searched_learned_mixture_policy,
@@ -38,9 +38,26 @@ class TargetSearchResult:
     train_score: float
     test_score: float
     benchmark_score: float
+    promotion_gate: "PromotionGateResult"
     train_summaries: list[dict]
     test_summaries: list[dict]
     benchmark_summaries: list[dict]
+
+
+@dataclass(frozen=True)
+class PromotionGateResult:
+    accepted: bool
+    min_delta: float
+    target_family_candidate_score: float
+    target_family_incumbent_score: float
+    target_family_delta: float
+    benchmark_target_candidate_score: float
+    benchmark_target_incumbent_score: float
+    benchmark_target_delta: float
+    signed_ensemble_candidate_score: float
+    signed_ensemble_incumbent_score: float
+    signed_ensemble_delta: float
+    failed_checks: tuple[str, ...]
 
 
 def target_branch_candidate_policy(params: TargetBranchParams, name: str = "target_branch_candidate") -> BenchmarkPolicy:
@@ -65,6 +82,17 @@ def target_branch_candidate_policy(params: TargetBranchParams, name: str = "targ
         target_bonus=params.target_bonus,
         target_excess_weight=params.target_excess_weight,
         name=name,
+    )
+
+
+def signed_policy_with_target_delegate(target_delegate: BenchmarkPolicy, name: str) -> BenchmarkPolicy:
+    return SignedRegimeAdaptivePolicy(
+        name=name,
+        ruin_delegate=StaticObjectivePolicy(OCEObjective(shortfall_penalty=3.0), name=f"{name}_ruin_oce"),
+        low_shift_delegate=StaticObjectivePolicy(EntropicObjective(risk_aversion=0.025), name=f"{name}_low_entropic"),
+        target_delegate=target_delegate,
+        drawdown_delegate=StaticObjectivePolicy(EntropicObjective(risk_aversion=0.01), name=f"{name}_drawdown_entropic"),
+        high_shift_delegate=StaticObjectivePolicy(EntropicObjective(risk_aversion=0.025), name=f"{name}_high_entropic"),
     )
 
 
@@ -116,6 +144,20 @@ def aggregate_paper_score(summaries: list[BenchmarkSummary]) -> float:
     return sum(summary_score(summary) for summary in summaries) / len(summaries)
 
 
+def score_policy(
+    policy: BenchmarkPolicy,
+    tasks: list[RiskTask],
+    episodes: int,
+    seed: int,
+    hand_depth: int,
+    score_fn,
+) -> tuple[float, list[BenchmarkSummary]]:
+    _episodes, summaries = run_benchmark(tasks=tasks, policies=[policy], episodes=episodes, seed=seed, hand_depth=hand_depth)
+    if not summaries:
+        return float("-inf"), summaries
+    return sum(score_fn(summary) for summary in summaries) / len(summaries), summaries
+
+
 def evaluate_target_policy(
     policy: BenchmarkPolicy,
     tasks: list[RiskTask],
@@ -125,6 +167,99 @@ def evaluate_target_policy(
 ) -> tuple[float, list[BenchmarkSummary]]:
     _episodes, summaries = run_benchmark(tasks=tasks, policies=[policy], episodes=episodes, seed=seed, hand_depth=hand_depth)
     return aggregate_target_score(summaries), summaries
+
+
+def evaluate_promotion_gate(
+    candidate_target_policy: BenchmarkPolicy,
+    test_tasks: list[RiskTask],
+    benchmark_tasks: list[RiskTask],
+    episodes: int,
+    seed: int,
+    hand_depth: int,
+    min_delta: float = 0.0,
+) -> PromotionGateResult:
+    incumbent_target = searched_learned_mixture_policy(name="target_branch_incumbent")
+    benchmark_target_tasks = [task for task in benchmark_tasks if task.name == "RiskBlackjack-Target-v0"]
+    if not benchmark_target_tasks:
+        raise ValueError("benchmark_tasks must include RiskBlackjack-Target-v0")
+
+    target_family_candidate_score, _candidate_test = score_policy(
+        candidate_target_policy,
+        test_tasks,
+        episodes,
+        seed,
+        hand_depth,
+        target_summary_score,
+    )
+    target_family_incumbent_score, _incumbent_test = score_policy(
+        incumbent_target,
+        test_tasks,
+        episodes,
+        seed,
+        hand_depth,
+        target_summary_score,
+    )
+    benchmark_target_candidate_score, _candidate_target = score_policy(
+        candidate_target_policy,
+        benchmark_target_tasks,
+        episodes,
+        seed + 101,
+        hand_depth,
+        target_summary_score,
+    )
+    benchmark_target_incumbent_score, _incumbent_target = score_policy(
+        incumbent_target,
+        benchmark_target_tasks,
+        episodes,
+        seed + 101,
+        hand_depth,
+        target_summary_score,
+    )
+
+    candidate_signed = signed_policy_with_target_delegate(candidate_target_policy, name="signed_candidate_target")
+    incumbent_signed = signed_policy_with_target_delegate(incumbent_target, name="signed_incumbent_target")
+    signed_ensemble_candidate_score, _candidate_signed = score_policy(
+        candidate_signed,
+        benchmark_tasks,
+        episodes,
+        seed + 202,
+        hand_depth,
+        summary_score,
+    )
+    signed_ensemble_incumbent_score, _incumbent_signed = score_policy(
+        incumbent_signed,
+        benchmark_tasks,
+        episodes,
+        seed + 202,
+        hand_depth,
+        summary_score,
+    )
+
+    target_family_delta = target_family_candidate_score - target_family_incumbent_score
+    benchmark_target_delta = benchmark_target_candidate_score - benchmark_target_incumbent_score
+    signed_ensemble_delta = signed_ensemble_candidate_score - signed_ensemble_incumbent_score
+    failed_checks = []
+    if target_family_delta <= min_delta:
+        failed_checks.append("target_family")
+    if benchmark_target_delta <= min_delta:
+        failed_checks.append("benchmark_target")
+    if signed_ensemble_delta <= min_delta:
+        failed_checks.append("signed_ensemble")
+
+    return PromotionGateResult(
+        accepted=not failed_checks,
+        min_delta=min_delta,
+        target_family_candidate_score=target_family_candidate_score,
+        target_family_incumbent_score=target_family_incumbent_score,
+        target_family_delta=target_family_delta,
+        benchmark_target_candidate_score=benchmark_target_candidate_score,
+        benchmark_target_incumbent_score=benchmark_target_incumbent_score,
+        benchmark_target_delta=benchmark_target_delta,
+        signed_ensemble_candidate_score=signed_ensemble_candidate_score,
+        signed_ensemble_incumbent_score=signed_ensemble_incumbent_score,
+        signed_ensemble_delta=signed_ensemble_delta,
+        failed_checks=tuple(failed_checks),
+    )
 
 
 def target_baseline_policies() -> list[BenchmarkPolicy]:
@@ -189,6 +324,7 @@ def search_target_branch_policy(
     smoke: bool = False,
     max_candidates: int | None = None,
     selection_seeds: int = 1,
+    promotion_min_delta: float = 0.0,
 ) -> TargetSearchResult:
     candidates = target_candidate_params(smoke=smoke)
     if max_candidates is not None and len(candidates) > max_candidates:
@@ -234,11 +370,21 @@ def search_target_branch_policy(
         seed=seed + 702_000,
         hand_depth=hand_depth,
     )
+    promotion_gate = evaluate_promotion_gate(
+        candidate_target_policy=best_policy,
+        test_tasks=test_tasks,
+        benchmark_tasks=benchmark_tasks,
+        episodes=episodes,
+        seed=seed + 703_000,
+        hand_depth=hand_depth,
+        min_delta=promotion_min_delta,
+    )
     return TargetSearchResult(
         params=best_params,
         train_score=best_train_score,
         test_score=test_score,
         benchmark_score=aggregate_paper_score(benchmark_summaries),
+        promotion_gate=promotion_gate,
         train_summaries=[asdict(summary) for summary in best_train_summaries],
         test_summaries=[asdict(summary) for summary in test_summaries],
         benchmark_summaries=[asdict(summary) for summary in benchmark_summaries],

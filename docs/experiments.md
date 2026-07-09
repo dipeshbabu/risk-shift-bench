@@ -61,14 +61,16 @@ Target-branch search:
 
 ```bash
 uv run python -m experiments.target_branch_search \
-  --episodes 40 \
-  --max-candidates 32 \
-  --selection-seeds 2
+  --episodes 80 \
+  --max-candidates 64 \
+  --selection-seeds 3
 ```
 
 The search uses target-family train and held-out tasks, compares against strong
 target baselines, and reports whether a candidate is worth promoting into
-`signed_regime_learned_ensemble`.
+`signed_regime_learned_ensemble`. The promotion gate requires the candidate to
+beat the incumbent target delegate on held-out target-family tasks, the original
+`RiskBlackjack-Target-v0` task, and the full signed-ensemble benchmark.
 
 Multi-seed evaluation:
 

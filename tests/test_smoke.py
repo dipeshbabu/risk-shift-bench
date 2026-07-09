@@ -35,6 +35,7 @@ from risk_preference_inference.risk_models import (
 from risk_preference_inference.splits import make_split
 from risk_preference_inference.synthetic import generate_synthetic_records
 from risk_preference_inference.target_search import (
+    evaluate_promotion_gate,
     search_target_branch_policy,
     target_branch_candidate_policy,
     target_candidate_params,
@@ -167,7 +168,7 @@ class SmokeTests(unittest.TestCase):
         result = search_target_branch_policy(
             train_tasks=train,
             test_tasks=test,
-            benchmark_tasks=benchmark_tasks()[:1],
+            benchmark_tasks=benchmark_tasks(),
             episodes=1,
             seed=11,
             hand_depth=1,
@@ -175,6 +176,22 @@ class SmokeTests(unittest.TestCase):
             max_candidates=1,
         )
         self.assertTrue(result.test_summaries)
+        self.assertIsInstance(result.promotion_gate.accepted, bool)
+
+    def test_target_promotion_gate_reports_required_checks(self):
+        params = target_candidate_params(smoke=True)[0]
+        policy = target_branch_candidate_policy(params, name="candidate")
+        train, test = target_family_split()
+        report = evaluate_promotion_gate(
+            candidate_target_policy=policy,
+            test_tasks=test[:1],
+            benchmark_tasks=benchmark_tasks(),
+            episodes=1,
+            seed=13,
+            hand_depth=1,
+        )
+        self.assertIn(report.accepted, (True, False))
+        self.assertIsInstance(report.failed_checks, tuple)
 
     def test_state_adaptive_utility_search_runs(self):
         train_task = RiskTask(name="utility-train", rounds=2, initial_bankroll=120, target_bankroll=150)

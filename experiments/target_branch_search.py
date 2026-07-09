@@ -33,6 +33,7 @@ def main() -> None:
     parser.add_argument("--hand-depth", type=int, default=1)
     parser.add_argument("--max-candidates", type=int, default=64)
     parser.add_argument("--selection-seeds", type=int, default=1)
+    parser.add_argument("--promotion-min-delta", type=float, default=0.0)
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--out-dir", default="artifacts/target_branch_search")
     args = parser.parse_args()
@@ -49,6 +50,7 @@ def main() -> None:
         smoke=args.smoke,
         max_candidates=args.max_candidates,
         selection_seeds=args.selection_seeds,
+        promotion_min_delta=args.promotion_min_delta,
     )
     baseline_test = evaluate_target_baselines(
         tasks=test_tasks,
@@ -77,6 +79,7 @@ def main() -> None:
             "hand_depth": args.hand_depth,
             "max_candidates": args.max_candidates,
             "selection_seeds": args.selection_seeds,
+            "promotion_min_delta": args.promotion_min_delta,
             "smoke": args.smoke,
             "train_tasks": [task.name for task in train_tasks],
             "test_tasks": [task.name for task in test_tasks],
@@ -92,6 +95,8 @@ def main() -> None:
     print(f"best_test_target_score={result.test_score:.3f}")
     print(f"best_benchmark_paper_score={result.benchmark_score:.3f}")
     print(f"best_params={asdict(result.params)}")
+    print(f"promotion_accepted={result.promotion_gate.accepted}")
+    print(f"promotion_gate={asdict(result.promotion_gate)}")
     print("target_test_scores=" + str(payload["target_test_score_report"]["policy_target_scores"]))
     print("benchmark_paper_scores=" + str(payload["benchmark_score_report"]["policy_paper_scores"]))
 
