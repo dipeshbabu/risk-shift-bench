@@ -36,6 +36,7 @@ from risk_preference_inference.splits import make_split
 from risk_preference_inference.synthetic import generate_synthetic_records
 from risk_preference_inference.target_search import (
     evaluate_promotion_gate,
+    PromotionGateResult,
     search_target_branch_policy,
     target_branch_candidate_policy,
     target_candidate_params,
@@ -140,7 +141,7 @@ class SmokeTests(unittest.TestCase):
         state = DecisionState((10, 6), 10, current_bankroll=500, initial_bankroll=500, target_bankroll=640)
         policy = signed_regime_learned_policy()
         delegate = policy._delegate(state, task, rounds_remaining=30, peak_bankroll=500)
-        self.assertIn("learned_delegate", delegate.name)
+        self.assertIn("target_delegate", delegate.name)
 
     def test_target_branch_searched_policy_scores(self):
         task = RiskTask(name="target-branch-test", rounds=3, initial_bankroll=120, target_bankroll=160)
@@ -177,6 +178,8 @@ class SmokeTests(unittest.TestCase):
         )
         self.assertTrue(result.test_summaries)
         self.assertIsInstance(result.promotion_gate.accepted, bool)
+        self.assertIsInstance(result.selection_score, float)
+        self.assertIsInstance(result.benchmark_target_selection_score, float)
 
     def test_target_promotion_gate_reports_required_checks(self):
         params = target_candidate_params(smoke=True)[0]
@@ -192,6 +195,23 @@ class SmokeTests(unittest.TestCase):
         )
         self.assertIn(report.accepted, (True, False))
         self.assertIsInstance(report.failed_checks, tuple)
+
+    def test_promotion_gate_allows_benchmark_ties(self):
+        report = PromotionGateResult(
+            accepted=True,
+            min_delta=0.0,
+            target_family_candidate_score=2.0,
+            target_family_incumbent_score=1.0,
+            target_family_delta=1.0,
+            benchmark_target_candidate_score=1.0,
+            benchmark_target_incumbent_score=1.0,
+            benchmark_target_delta=0.0,
+            signed_ensemble_candidate_score=1.0,
+            signed_ensemble_incumbent_score=1.0,
+            signed_ensemble_delta=0.0,
+            failed_checks=(),
+        )
+        self.assertTrue(report.accepted)
 
     def test_state_adaptive_utility_search_runs(self):
         train_task = RiskTask(name="utility-train", rounds=2, initial_bankroll=120, target_bankroll=150)

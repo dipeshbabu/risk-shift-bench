@@ -210,30 +210,30 @@ def target_branch_searched_policy(name: str = "target_branch_searched") -> Bench
         deck_shift_weight=0.5,
         target_intercept=0.0,
         target_gap_weight=1.25,
-        terminal_weight=0.5,
+        terminal_weight=0.0,
         terminal_window=16,
-        cvar_alpha=0.1,
-        entropic_eta=0.005,
+        cvar_alpha=0.25,
+        entropic_eta=0.01,
         oce_penalty=3.0,
-        entropic_weight=0.25,
-        cvar_weight=0.1,
-        oce_weight=0.15,
+        entropic_weight=0.35,
+        cvar_weight=0.0,
+        oce_weight=0.1,
         deck_entropic_weight=1.25,
         ruin_penalty=250.0,
         drawdown_penalty=0.1,
-        target_bonus=350.0,
+        target_bonus=500.0,
         target_excess_weight=0.5,
         name=name,
     )
 
 
 def signed_regime_learned_policy(name: str = "signed_regime_learned_ensemble") -> BenchmarkPolicy:
-    learned_delegate = searched_learned_mixture_policy(name=f"{name}_learned_delegate")
+    target_delegate = target_branch_searched_policy(name=f"{name}_target_delegate")
     return SignedRegimeAdaptivePolicy(
         name=name,
         ruin_delegate=StaticObjectivePolicy(OCEObjective(shortfall_penalty=3.0), name=f"{name}_ruin_oce"),
         low_shift_delegate=StaticObjectivePolicy(EntropicObjective(risk_aversion=0.025), name=f"{name}_low_entropic"),
-        target_delegate=learned_delegate,
+        target_delegate=target_delegate,
         drawdown_delegate=StaticObjectivePolicy(EntropicObjective(risk_aversion=0.01), name=f"{name}_drawdown_entropic"),
         high_shift_delegate=StaticObjectivePolicy(EntropicObjective(risk_aversion=0.025), name=f"{name}_high_entropic"),
     )

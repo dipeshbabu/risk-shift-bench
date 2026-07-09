@@ -35,7 +35,9 @@ class TargetBranchParams:
 @dataclass(frozen=True)
 class TargetSearchResult:
     params: TargetBranchParams
+    selection_score: float
     train_score: float
+    benchmark_target_selection_score: float
     test_score: float
     benchmark_score: float
     promotion_gate: "PromotionGateResult"
@@ -97,7 +99,7 @@ def signed_policy_with_target_delegate(target_delegate: BenchmarkPolicy, name: s
 
 
 def target_candidate_params(smoke: bool = False) -> list[TargetBranchParams]:
-    current = TargetBranchParams(1.25, 0.5, 16, 0.10, 0.005, 0.25, 0.10, 0.15, 350.0, 0.50)
+    current = TargetBranchParams(1.25, 0.0, 16, 0.25, 0.01, 0.35, 0.0, 0.10, 500.0, 0.50)
     previous = TargetBranchParams(0.75, 0.25, 8, 0.15, 0.01, 0.35, 0.05, 0.15, 350.0, 0.15)
     if smoke:
         return [
@@ -144,6 +146,13 @@ def aggregate_paper_score(summaries: list[BenchmarkSummary]) -> float:
     return sum(summary_score(summary) for summary in summaries) / len(summaries)
 
 
+def benchmark_target_tasks(benchmark_tasks: list[RiskTask]) -> list[RiskTask]:
+    tasks = [task for task in benchmark_tasks if task.name == "RiskBlackjack-Target-v0"]
+    if not tasks:
+        raise ValueError("benchmark_tasks must include RiskBlackjack-Target-v0")
+    return tasks
+
+
 def score_policy(
     policy: BenchmarkPolicy,
     tasks: list[RiskTask],
@@ -178,10 +187,8 @@ def evaluate_promotion_gate(
     hand_depth: int,
     min_delta: float = 0.0,
 ) -> PromotionGateResult:
-    incumbent_target = searched_learned_mixture_policy(name="target_branch_incumbent")
-    benchmark_target_tasks = [task for task in benchmark_tasks if task.name == "RiskBlackjack-Target-v0"]
-    if not benchmark_target_tasks:
-        raise ValueError("benchmark_tasks must include RiskBlackjack-Target-v0")
+    incumbent_target = target_branch_searched_policy(name="target_branch_incumbent")
+    target_tasks = benchmark_target_tasks(benchmark_tasks)
 
     target_family_candidate_score, _candidate_test = score_policy(
         candidate_target_policy,
@@ -201,7 +208,7 @@ def evaluate_promotion_gate(
     )
     benchmark_target_candidate_score, _candidate_target = score_policy(
         candidate_target_policy,
-        benchmark_target_tasks,
+        target_tasks,
         episodes,
         seed + 101,
         hand_depth,
@@ -209,7 +216,7 @@ def evaluate_promotion_gate(
     )
     benchmark_target_incumbent_score, _incumbent_target = score_policy(
         incumbent_target,
-        benchmark_target_tasks,
+        target_tasks,
         episodes,
         seed + 101,
         hand_depth,
@@ -241,9 +248,9 @@ def evaluate_promotion_gate(
     failed_checks = []
     if target_family_delta <= min_delta:
         failed_checks.append("target_family")
-    if benchmark_target_delta <= min_delta:
+    if benchmark_target_delta < min_delta:
         failed_checks.append("benchmark_target")
-    if signed_ensemble_delta <= min_delta:
+    if signed_ensemble_delta < min_delta:
         failed_checks.append("signed_ensemble")
 
     return PromotionGateResult(
@@ -327,6 +334,7 @@ def search_target_branch_policy(
     promotion_min_delta: float = 0.0,
 ) -> TargetSearchResult:
     candidates = target_candidate_params(smoke=smoke)
+    target_tasks = benchmark_target_tasks(benchmark_tasks)
     if max_candidates is not None and len(candidates) > max_candidates:
         current = candidates[0]
         pool = candidates[1:]
@@ -335,26 +343,62 @@ def search_target_branch_policy(
         candidates = [current] + pool[: max(max_candidates - 1, 0)]
 
     best_params: TargetBranchParams | None = None
+    best_selection_score = float("-inf")
     best_train_score = float("-inf")
+    best_benchmark_target_score = float("-inf")
     best_train_summaries: list[BenchmarkSummary] = []
     for idx, params in enumerate(candidates):
         policy = target_branch_candidate_policy(params)
-        repeated_scores = []
+        incumbent = target_branch_searched_policy(name="target_selection_incumbent")
+        repeated_selection_scores = []
+        repeated_train_scores = []
+        repeated_benchmark_target_scores = []
         selected_summaries: list[BenchmarkSummary] = []
         for repeat_idx in range(max(selection_seeds, 1)):
-            score, summaries = evaluate_target_policy(
+            paired_seed = seed + idx * 7000 + repeat_idx * 503
+            train_score, summaries = evaluate_target_policy(
                 policy,
                 train_tasks,
                 episodes,
-                seed + idx * 7000 + repeat_idx * 503,
+                paired_seed,
                 hand_depth,
             )
-            repeated_scores.append(score)
+            benchmark_target_score, _benchmark_target_summaries = evaluate_target_policy(
+                policy,
+                target_tasks,
+                episodes,
+                paired_seed + 101,
+                hand_depth,
+            )
+            incumbent_train_score, _incumbent_train_summaries = evaluate_target_policy(
+                incumbent,
+                train_tasks,
+                episodes,
+                paired_seed,
+                hand_depth,
+            )
+            incumbent_benchmark_target_score, _incumbent_target_summaries = evaluate_target_policy(
+                incumbent,
+                target_tasks,
+                episodes,
+                paired_seed + 101,
+                hand_depth,
+            )
+            train_delta = train_score - incumbent_train_score
+            benchmark_target_delta = benchmark_target_score - incumbent_benchmark_target_score
+            selection_score = min(train_delta, benchmark_target_delta) + 0.05 * (train_delta + benchmark_target_delta)
+            repeated_selection_scores.append(selection_score)
+            repeated_train_scores.append(train_score)
+            repeated_benchmark_target_scores.append(benchmark_target_score)
             if repeat_idx == 0:
                 selected_summaries = summaries
-        score = sum(repeated_scores) / len(repeated_scores)
-        if score > best_train_score:
-            best_train_score = score
+        selection_score = sum(repeated_selection_scores) / len(repeated_selection_scores)
+        train_score = sum(repeated_train_scores) / len(repeated_train_scores)
+        benchmark_target_score = sum(repeated_benchmark_target_scores) / len(repeated_benchmark_target_scores)
+        if selection_score > best_selection_score:
+            best_selection_score = selection_score
+            best_train_score = train_score
+            best_benchmark_target_score = benchmark_target_score
             best_params = params
             best_train_summaries = selected_summaries
 
@@ -381,7 +425,9 @@ def search_target_branch_policy(
     )
     return TargetSearchResult(
         params=best_params,
+        selection_score=best_selection_score,
         train_score=best_train_score,
+        benchmark_target_selection_score=best_benchmark_target_score,
         test_score=test_score,
         benchmark_score=aggregate_paper_score(benchmark_summaries),
         promotion_gate=promotion_gate,

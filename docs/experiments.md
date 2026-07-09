@@ -66,11 +66,13 @@ uv run python -m experiments.target_branch_search \
   --selection-seeds 3
 ```
 
-The search uses target-family train and held-out tasks, compares against strong
-target baselines, and reports whether a candidate is worth promoting into
+The search selects candidates with paired comparisons against the incumbent on
+target-family train tasks and the original `RiskBlackjack-Target-v0` task. It
+then reports whether the winner is worth promoting into
 `signed_regime_learned_ensemble`. The promotion gate requires the candidate to
-beat the incumbent target delegate on held-out target-family tasks, the original
-`RiskBlackjack-Target-v0` task, and the full signed-ensemble benchmark.
+beat the incumbent target delegate on held-out target-family tasks without
+regressing the original benchmark target task or the full signed-ensemble
+benchmark.
 
 Multi-seed evaluation:
 

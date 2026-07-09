@@ -92,6 +92,8 @@ def main() -> None:
     write_json(out_dir / "summary.json", payload)
 
     print(f"best_train_target_score={result.train_score:.3f}")
+    print(f"best_selection_score={result.selection_score:.3f}")
+    print(f"best_benchmark_target_selection_score={result.benchmark_target_selection_score:.3f}")
     print(f"best_test_target_score={result.test_score:.3f}")
     print(f"best_benchmark_paper_score={result.benchmark_score:.3f}")
     print(f"best_params={asdict(result.params)}")
