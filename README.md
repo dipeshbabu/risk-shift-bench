@@ -132,6 +132,12 @@ uv run python -m experiments.multiseed_evaluation --config configs/benchmark_ful
 This writes per seed/task scores, aggregate scores, and paired deltas against
 `signed_regime_learned_ensemble` by default.
 
+Search a target-specific branch for the signed ensemble:
+
+```bash
+uv run python -m experiments.target_branch_search
+```
+
 Export exact small-horizon final-bankroll distributions:
 
 ```bash

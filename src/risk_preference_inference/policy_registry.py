@@ -202,6 +202,31 @@ def searched_learned_mixture_policy(name: str = "learned_mixture_searched") -> B
     )
 
 
+def target_branch_searched_policy(name: str = "target_branch_searched") -> BenchmarkPolicy:
+    return learned_mixture_policy(
+        risk_intercept=0.0,
+        bankroll_weight=0.25,
+        drawdown_weight=0.5,
+        deck_shift_weight=0.5,
+        target_intercept=0.0,
+        target_gap_weight=1.25,
+        terminal_weight=0.5,
+        terminal_window=16,
+        cvar_alpha=0.1,
+        entropic_eta=0.005,
+        oce_penalty=3.0,
+        entropic_weight=0.25,
+        cvar_weight=0.1,
+        oce_weight=0.15,
+        deck_entropic_weight=1.25,
+        ruin_penalty=250.0,
+        drawdown_penalty=0.1,
+        target_bonus=350.0,
+        target_excess_weight=0.5,
+        name=name,
+    )
+
+
 def signed_regime_learned_policy(name: str = "signed_regime_learned_ensemble") -> BenchmarkPolicy:
     learned_delegate = searched_learned_mixture_policy(name=f"{name}_learned_delegate")
     return SignedRegimeAdaptivePolicy(

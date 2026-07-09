@@ -57,6 +57,19 @@ uv run python -m experiments.ablation_study --config configs/benchmark_full.json
 The ablation artifact reports aggregate scores, per-task scores, and raw
 summary metrics for branch-disabled variants of the regime-adaptive ensemble.
 
+Target-branch search:
+
+```bash
+uv run python -m experiments.target_branch_search \
+  --episodes 40 \
+  --max-candidates 32 \
+  --selection-seeds 2
+```
+
+The search uses target-family train and held-out tasks, compares against strong
+target baselines, and reports whether a candidate is worth promoting into
+`signed_regime_learned_ensemble`.
+
 Multi-seed evaluation:
 
 ```bash

@@ -5,6 +5,7 @@ from risk_preference_inference.active_query import select_informative_states
 from risk_preference_inference.benchmark import run_benchmark
 from risk_preference_inference.benchmark import EpisodeResult, summarize_results
 from risk_preference_inference.envs import RiskTask
+from risk_preference_inference.envs import benchmark_tasks, target_family_split
 from risk_preference_inference.evaluation import evaluate
 from risk_preference_inference.multiround_distributions import final_bankroll_distribution
 from risk_preference_inference.objectives import mean
@@ -15,6 +16,7 @@ from risk_preference_inference.policy_registry import (
     searched_learned_mixture_policy,
     signed_regime_learned_policy,
     state_adaptive_utility_policy,
+    target_branch_searched_policy,
     strong_baseline_grid,
 )
 from risk_preference_inference.adaptive_search import search_adaptive_utility_policy, search_learned_mixture_policy
@@ -32,6 +34,11 @@ from risk_preference_inference.risk_models import (
 )
 from risk_preference_inference.splits import make_split
 from risk_preference_inference.synthetic import generate_synthetic_records
+from risk_preference_inference.target_search import (
+    search_target_branch_policy,
+    target_branch_candidate_policy,
+    target_candidate_params,
+)
 
 
 class SmokeTests(unittest.TestCase):
@@ -133,6 +140,41 @@ class SmokeTests(unittest.TestCase):
         policy = signed_regime_learned_policy()
         delegate = policy._delegate(state, task, rounds_remaining=30, peak_bankroll=500)
         self.assertIn("learned_delegate", delegate.name)
+
+    def test_target_branch_searched_policy_scores(self):
+        task = RiskTask(name="target-branch-test", rounds=3, initial_bankroll=120, target_bankroll=160)
+        state = DecisionState((10, 6), 10, current_bankroll=120, initial_bankroll=120, target_bankroll=160)
+        probs = target_branch_searched_policy().action_probabilities(state, task, rounds_remaining=3, hand_depth=1)
+        self.assertEqual(set(probs), {"hit", "stand"})
+
+    def test_target_family_split_has_held_out_tasks(self):
+        train, test = target_family_split()
+        self.assertTrue(train)
+        self.assertTrue(test)
+        self.assertFalse({task.name for task in train} & {task.name for task in test})
+
+    def test_target_branch_candidate_policy_scores(self):
+        params = target_candidate_params(smoke=True)[0]
+        policy = target_branch_candidate_policy(params)
+        task = RiskTask(name="target-candidate", rounds=3, initial_bankroll=120, target_bankroll=160)
+        state = DecisionState((10, 6), 10, current_bankroll=120, initial_bankroll=120, target_bankroll=160)
+        probs = policy.action_probabilities(state, task, rounds_remaining=3, hand_depth=1)
+        self.assertEqual(set(probs), {"hit", "stand"})
+
+    def test_target_branch_search_runs(self):
+        train = [RiskTask(name="target-train", rounds=2, initial_bankroll=120, target_bankroll=150)]
+        test = [RiskTask(name="target-test", rounds=2, initial_bankroll=120, target_bankroll=150)]
+        result = search_target_branch_policy(
+            train_tasks=train,
+            test_tasks=test,
+            benchmark_tasks=benchmark_tasks()[:1],
+            episodes=1,
+            seed=11,
+            hand_depth=1,
+            smoke=True,
+            max_candidates=1,
+        )
+        self.assertTrue(result.test_summaries)
 
     def test_state_adaptive_utility_search_runs(self):
         train_task = RiskTask(name="utility-train", rounds=2, initial_bankroll=120, target_bankroll=150)

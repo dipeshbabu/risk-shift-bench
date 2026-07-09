@@ -43,3 +43,32 @@ def benchmark_tasks() -> list[RiskTask]:
         RiskTask(name="RiskBlackjack-LowCardShift-v0", card_probs=LOW_CARD_SHIFT),
         RiskTask(name="RiskBlackjack-HighCardShift-v0", card_probs=HIGH_CARD_SHIFT),
     ]
+
+
+def target_family_tasks() -> list[RiskTask]:
+    return [
+        RiskTask(name="TargetFamily-Near-v0", rounds=20, initial_bankroll=500.0, target_bankroll=580.0),
+        RiskTask(name="TargetFamily-Far-v0", rounds=35, initial_bankroll=500.0, target_bankroll=720.0),
+        RiskTask(name="TargetFamily-ShortHorizon-v0", rounds=12, initial_bankroll=500.0, target_bankroll=620.0),
+        RiskTask(name="TargetFamily-LongHorizon-v0", rounds=45, initial_bankroll=500.0, target_bankroll=700.0),
+        RiskTask(name="TargetFamily-LowBankroll-v0", rounds=30, initial_bankroll=320.0, target_bankroll=480.0),
+        RiskTask(name="TargetFamily-LargeBet-v0", rounds=25, initial_bankroll=500.0, bet=40.0, target_bankroll=700.0),
+        RiskTask(name="TargetFamily-Drawdown-v0", rounds=30, initial_bankroll=500.0, target_bankroll=650.0, drawdown_limit=0.12),
+        RiskTask(name="TargetFamily-LowCardShift-v0", rounds=30, initial_bankroll=500.0, target_bankroll=640.0, card_probs=LOW_CARD_SHIFT),
+        RiskTask(name="TargetFamily-HighCardShift-v0", rounds=30, initial_bankroll=500.0, target_bankroll=680.0, card_probs=HIGH_CARD_SHIFT),
+    ]
+
+
+def target_family_split() -> tuple[list[RiskTask], list[RiskTask]]:
+    tasks = target_family_tasks()
+    train_names = {
+        "TargetFamily-Near-v0",
+        "TargetFamily-Far-v0",
+        "TargetFamily-ShortHorizon-v0",
+        "TargetFamily-LongHorizon-v0",
+        "TargetFamily-LowBankroll-v0",
+        "TargetFamily-Drawdown-v0",
+    }
+    train = [task for task in tasks if task.name in train_names]
+    test = [task for task in tasks if task.name not in train_names]
+    return train, test
