@@ -12,6 +12,17 @@ Full benchmark:
 uv run python -m experiments.risk_benchmark --config configs/benchmark_full.json
 ```
 
+Frontier benchmark:
+
+```bash
+uv run python -m experiments.risk_benchmark --config configs/benchmark_frontier.json
+```
+
+The frontier config uses the expanded task suite: the original benchmark plus
+extreme card-distribution shifts, hidden episode-level deck regimes, tight
+target horizons, near-ruin high-bet settings, and long-horizon drawdown stress
+tests.
+
 Validate full-run configuration without running the expensive experiment:
 
 ```bash

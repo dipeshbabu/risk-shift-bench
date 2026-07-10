@@ -231,11 +231,17 @@ def signed_regime_learned_policy(name: str = "signed_regime_learned_ensemble") -
     target_delegate = target_branch_searched_policy(name=f"{name}_target_delegate")
     return SignedRegimeAdaptivePolicy(
         name=name,
+        mean_delegate=learned_mixture_policy(name=f"{name}_mean_mixture"),
+        severe_ruin_delegate=BasicStrategyPolicy(name=f"{name}_severe_ruin_basic"),
+        short_target_delegate=BasicStrategyPolicy(name=f"{name}_short_target_basic"),
+        long_drawdown_delegate=BasicStrategyPolicy(name=f"{name}_long_drawdown_basic"),
+        hidden_tail_delegate=BasicStrategyPolicy(name=f"{name}_hidden_tail_basic"),
         ruin_delegate=StaticObjectivePolicy(OCEObjective(shortfall_penalty=3.0), name=f"{name}_ruin_oce"),
         low_shift_delegate=StaticObjectivePolicy(EntropicObjective(risk_aversion=0.025), name=f"{name}_low_entropic"),
+        extreme_low_shift_delegate=searched_learned_mixture_policy(name=f"{name}_extreme_low_mixture"),
         target_delegate=target_delegate,
         drawdown_delegate=StaticObjectivePolicy(EntropicObjective(risk_aversion=0.01), name=f"{name}_drawdown_entropic"),
-        high_shift_delegate=StaticObjectivePolicy(EntropicObjective(risk_aversion=0.025), name=f"{name}_high_entropic"),
+        high_shift_delegate=learned_mixture_policy(name=f"{name}_high_mixture"),
     )
 
 

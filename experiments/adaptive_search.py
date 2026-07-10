@@ -14,13 +14,13 @@ from risk_preference_inference.adaptive_search import (
     search_learned_mixture_policy,
 )
 from risk_preference_inference.config import load_adaptive_search_config
-from risk_preference_inference.envs import benchmark_tasks
+from risk_preference_inference.envs import available_benchmark_tasks
 from risk_preference_inference.learned_adaptive_search import search_learned_adaptive_policy
 from risk_preference_inference.reporting import write_json
 
 
 def select_tasks(names: tuple[str, ...]) -> list:
-    all_tasks = {task.name: task for task in benchmark_tasks()}
+    all_tasks = {task.name: task for task in available_benchmark_tasks()}
     missing = set(names) - set(all_tasks)
     if missing:
         raise ValueError(f"Unknown tasks: {sorted(missing)}")

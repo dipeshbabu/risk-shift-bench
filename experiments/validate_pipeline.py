@@ -8,15 +8,21 @@ from pathlib import Path
 from risk_preference_inference.adaptive_search import candidate_params, mixture_candidate_params, utility_candidate_params
 from risk_preference_inference.ablations import ablation_policies
 from risk_preference_inference.config import load_adaptive_search_config, load_benchmark_config
-from risk_preference_inference.envs import benchmark_tasks
+from risk_preference_inference.envs import available_benchmark_tasks, benchmark_suite_names, benchmark_tasks
 from risk_preference_inference.learned_adaptive_search import linear_candidates
 from risk_preference_inference.policy_registry import core_policies, strong_baseline_grid
 
 
-def validate_task_names(names: tuple[str, ...] | None) -> None:
+def validate_suite_name(suite: str) -> None:
+    if suite not in benchmark_suite_names():
+        raise ValueError(f"Unknown benchmark suite: {suite}")
+
+
+def validate_task_names(names: tuple[str, ...] | None, suite: str | None = None) -> None:
     if names is None:
         return
-    available = {task.name for task in benchmark_tasks()}
+    available_tasks = benchmark_tasks(suite) if suite is not None else available_benchmark_tasks()
+    available = {task.name for task in available_tasks}
     missing = set(names) - available
     if missing:
         raise ValueError(f"Unknown task names: {sorted(missing)}")
@@ -30,12 +36,13 @@ def main() -> None:
 
     benchmark_config = load_benchmark_config(args.benchmark_config)
     adaptive_config = load_adaptive_search_config(args.adaptive_config)
-    validate_task_names(benchmark_config.tasks)
+    validate_suite_name(benchmark_config.suite)
+    validate_task_names(benchmark_config.tasks, suite=benchmark_config.suite)
     validate_task_names(adaptive_config.train_tasks)
     validate_task_names(adaptive_config.test_tasks)
 
     policy_count = len(core_policies()) if benchmark_config.policy_set == "core" else len(strong_baseline_grid())
-    task_count = len(benchmark_config.tasks) if benchmark_config.tasks is not None else len(benchmark_tasks())
+    task_count = len(benchmark_config.tasks) if benchmark_config.tasks is not None else len(benchmark_tasks(benchmark_config.suite))
     benchmark_episodes = policy_count * task_count * benchmark_config.episodes
     ablation_rollouts = len(ablation_policies()) * task_count * benchmark_config.episodes
 
@@ -49,6 +56,7 @@ def main() -> None:
     learned_evaluated = min(learned_candidates, adaptive_config.max_candidates or learned_candidates)
 
     print("pipeline validation ok")
+    print(f"benchmark_suite={benchmark_config.suite}")
     print(f"benchmark_tasks={task_count}")
     print(f"benchmark_policies={policy_count}")
     print(f"benchmark_episode_rollouts={benchmark_episodes}")

@@ -12,6 +12,7 @@ class BenchmarkConfig:
     episodes: int = 100
     seed: int = 0
     hand_depth: int = 4
+    suite: str = "standard"
     tasks: tuple[str, ...] | None = None
     policy_set: str = "core"
     out_dir: str = "artifacts/risk_benchmark"

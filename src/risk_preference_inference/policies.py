@@ -176,8 +176,16 @@ class SignedRegimeAdaptivePolicy(BenchmarkPolicy):
     name: str = "signed_regime_learned_ensemble"
     positive_shift_threshold: float = 0.35
     negative_shift_threshold: float = -0.35
+    extreme_negative_shift_threshold: float = -2.1
+    severe_ruin_bet_ratio: float = 6.0
+    short_target_rounds: int = 12
+    long_drawdown_rounds: int = 45
     require_target_regime: bool = True
     mean_delegate: BenchmarkPolicy = field(default_factory=BasicStrategyPolicy)
+    severe_ruin_delegate: BenchmarkPolicy = field(default_factory=BasicStrategyPolicy)
+    short_target_delegate: BenchmarkPolicy = field(default_factory=BasicStrategyPolicy)
+    long_drawdown_delegate: BenchmarkPolicy = field(default_factory=BasicStrategyPolicy)
+    hidden_tail_delegate: BenchmarkPolicy = field(default_factory=BasicStrategyPolicy)
     ruin_delegate: BenchmarkPolicy = field(
         default_factory=lambda: StaticObjectivePolicy(OCEObjective(shortfall_penalty=3.0), name="signed_ruin_oce")
     )
@@ -193,12 +201,22 @@ class SignedRegimeAdaptivePolicy(BenchmarkPolicy):
     low_shift_delegate: BenchmarkPolicy = field(
         default_factory=lambda: StaticObjectivePolicy(OCEObjective(shortfall_penalty=3.0), name="signed_low_oce")
     )
+    extreme_low_shift_delegate: BenchmarkPolicy = field(
+        default_factory=lambda: StaticObjectivePolicy(OCEObjective(shortfall_penalty=3.0), name="signed_extreme_low_oce")
+    )
 
     def _card_mean(self, task: RiskTask) -> float:
         return sum(card * prob for card, prob in task.card_probs)
 
     def _standard_card_mean(self) -> float:
         return sum(card * prob for card, prob in STANDARD_DECK)
+
+    def _regime_shift_span(self, task: RiskTask) -> float:
+        if task.episode_card_regimes is None:
+            return 0.0
+        standard_mean = self._standard_card_mean()
+        shifts = [sum(card * prob for card, prob in card_probs) - standard_mean for card_probs, _prob in task.episode_card_regimes]
+        return max(shifts) - min(shifts)
 
     def _delegate(
         self,
@@ -208,17 +226,30 @@ class SignedRegimeAdaptivePolicy(BenchmarkPolicy):
         peak_bankroll: float | None,
     ) -> BenchmarkPolicy:
         mean_shift = self._card_mean(task) - self._standard_card_mean()
+        target_gap = max(0.0, task.target_bankroll - state.current_bankroll)
         target_regime = task.rounds > 25 or not self.require_target_regime
+        target_pressure = target_gap <= 6.0 * task.bet or rounds_remaining <= 10
+
+        if task.initial_bankroll <= self.severe_ruin_bet_ratio * task.bet:
+            return self.severe_ruin_delegate
+        if task.rounds <= self.short_target_rounds and target_gap >= 4.0 * task.bet:
+            return self.short_target_delegate
+        if task.episode_card_regimes is not None and self._regime_shift_span(task) > 2.5:
+            return self.hidden_tail_delegate
+        if mean_shift <= self.extreme_negative_shift_threshold:
+            return self.extreme_low_shift_delegate
 
         if mean_shift >= self.positive_shift_threshold:
             return self.high_shift_delegate
         if mean_shift <= self.negative_shift_threshold:
             return self.low_shift_delegate
+        if task.drawdown_limit <= 0.15 and task.rounds >= self.long_drawdown_rounds:
+            return self.long_drawdown_delegate
         if task.initial_bankroll <= 15.0 * task.bet:
             return self.ruin_delegate
         if task.drawdown_limit <= 0.15:
             return self.drawdown_delegate
-        if target_regime:
+        if target_regime and target_pressure:
             return self.target_delegate
         return self.mean_delegate
 

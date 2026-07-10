@@ -12,6 +12,7 @@ from risk_preference_inference.objectives import EntropicObjective, MeanObjectiv
 from risk_preference_inference.policies import BasicStrategyPolicy, BenchmarkPolicy, RegimeAdaptivePolicy, StaticObjectivePolicy
 from risk_preference_inference.policy_registry import (
     adaptive_cvar_policy,
+    learned_mixture_policy,
     searched_learned_mixture_policy,
     signed_regime_learned_policy,
     state_adaptive_utility_policy,
@@ -26,6 +27,7 @@ def multiseed_policies() -> list[BenchmarkPolicy]:
         StaticObjectivePolicy(OCEObjective(shortfall_penalty=3.0), name="fixed_oce_3"),
         adaptive_cvar_policy(name="naive_adaptive_cvar"),
         state_adaptive_utility_policy(name="adaptive_utility_default"),
+        learned_mixture_policy(name="learned_mixture_default"),
         searched_learned_mixture_policy(),
         RegimeAdaptivePolicy(),
         signed_regime_learned_policy(),

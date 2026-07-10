@@ -53,6 +53,18 @@ def sample_card(card_probs: CardDistribution, rng: random.Random) -> int:
     return int(sample_distribution(tuple((float(card), prob) for card, prob in card_probs), rng))
 
 
+def sample_episode_card_probs(task: RiskTask, rng: random.Random) -> CardDistribution:
+    if task.episode_card_regimes is None:
+        return task.card_probs
+    threshold = rng.random()
+    cumulative = 0.0
+    for card_probs, prob in task.episode_card_regimes:
+        cumulative += prob
+        if threshold <= cumulative:
+            return card_probs
+    return task.episode_card_regimes[-1][0]
+
+
 def sample_action(probs: dict[str, float], rng: random.Random) -> str:
     return "hit" if rng.random() < probs["hit"] else "stand"
 
@@ -64,6 +76,7 @@ def simulate_episode(
     hand_depth: int = 4,
 ) -> EpisodeResult:
     rng = random.Random(seed)
+    episode_card_probs = sample_episode_card_probs(task, rng)
     bankroll = task.initial_bankroll
     peak = bankroll
     min_bankroll = bankroll
@@ -74,8 +87,8 @@ def simulate_episode(
     for round_idx in range(task.rounds):
         if bankroll <= task.ruin_bankroll:
             break
-        player_cards = tuple(sorted((sample_card(task.card_probs, rng), sample_card(task.card_probs, rng))))
-        dealer_card = sample_card(task.card_probs, rng)
+        player_cards = tuple(sorted((sample_card(episode_card_probs, rng), sample_card(episode_card_probs, rng))))
+        dealer_card = sample_card(episode_card_probs, rng)
         state = DecisionState(
             player_cards=player_cards,
             dealer_card=dealer_card,
@@ -95,10 +108,10 @@ def simulate_episode(
             )
             action = sample_action(probs, rng)
             if action == "stand":
-                payoff_distribution = stand_payoff_distribution(state.player_total, state.dealer_card, state.bet, task.card_probs)
+                payoff_distribution = stand_payoff_distribution(state.player_total, state.dealer_card, state.bet, episode_card_probs)
                 payoff = sample_distribution(payoff_distribution, rng)
                 break
-            state = add_card(state, sample_card(task.card_probs, rng))
+            state = add_card(state, sample_card(episode_card_probs, rng))
             if is_bust(state.player_cards):
                 payoff = -task.bet
                 break

@@ -8,7 +8,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from risk_preference_inference.config import load_benchmark_config
-from risk_preference_inference.envs import benchmark_tasks
+from risk_preference_inference.envs import benchmark_suite_names, benchmark_tasks
 from risk_preference_inference.multiseed import aggregate_seed_scores, paired_policy_deltas, run_multiseed_evaluation
 from risk_preference_inference.reporting import write_json
 
@@ -37,8 +37,8 @@ def write_csv(path: Path, rows: list[dict]) -> None:
         writer.writerows(rows)
 
 
-def select_tasks(names: list[str] | None) -> list:
-    tasks = benchmark_tasks()
+def select_tasks(names: list[str] | None, suite: str) -> list:
+    tasks = benchmark_tasks(suite)
     if not names:
         return tasks
     requested = set(names)
@@ -59,6 +59,7 @@ def main() -> None:
     parser.add_argument("--seeds", default="0,1,2,3,4")
     parser.add_argument("--episodes", type=int, default=None)
     parser.add_argument("--hand-depth", type=int, default=None)
+    parser.add_argument("--suite", choices=benchmark_suite_names(), default=None)
     parser.add_argument("--tasks", nargs="*", default=None)
     parser.add_argument("--out-dir", default="artifacts/multiseed")
     parser.add_argument("--input-scores", default=None)
@@ -69,7 +70,8 @@ def main() -> None:
     seeds = parse_seeds(args.seeds)
     episodes = args.episodes if args.episodes is not None else config.episodes
     hand_depth = args.hand_depth if args.hand_depth is not None else config.hand_depth
-    tasks = select_tasks(args.tasks or (list(config.tasks) if config.tasks is not None else None))
+    suite = args.suite or config.suite
+    tasks = select_tasks(args.tasks or (list(config.tasks) if config.tasks is not None else None), suite)
 
     if args.input_scores:
         rows = read_csv(Path(args.input_scores))
@@ -95,6 +97,7 @@ def main() -> None:
             "seeds": seeds,
             "episodes": episodes,
             "hand_depth": hand_depth,
+            "suite": suite,
             "tasks": [task.name for task in tasks],
             "seed_task_scores": rows,
             "aggregate_scores": aggregate,

@@ -11,7 +11,7 @@ distribution-shift constraints.
 
 ## Repository Contents
 
-- `risk_preference_inference.envs`: benchmark task definitions such as mean-return, ruin-constrained, target-reaching, drawdown, and shifted-deck regimes.
+- `risk_preference_inference.envs`: benchmark task suites, including standard mean-return, ruin-constrained, target-reaching, drawdown, shifted-deck, hidden-regime, and tail-risk regimes.
 - `risk_preference_inference.objectives`: mean, CVaR, entropic risk, OCE, ruin-constrained, and target-seeking distributional objectives.
 - `risk_preference_inference.adaptive_risk`: state-adaptive CVaR schedules, adaptive utility objectives, learned objective mixtures, and constraint-aware risk gates.
 - `risk_preference_inference.policies`: benchmark policies, including objective policies and a regime-adaptive ensemble.
@@ -65,6 +65,16 @@ Run from a checked-in config:
 ```bash
 uv run python -m experiments.risk_benchmark --config configs/benchmark_smoke.json
 ```
+
+Run the expanded frontier benchmark suite:
+
+```bash
+uv run python -m experiments.risk_benchmark --config configs/benchmark_frontier.json
+```
+
+The frontier suite extends the standard benchmark with extreme deck shifts,
+hidden per-episode regime mixtures, near-ruin high-bet episodes, tight target
+horizons, and long-horizon drawdown stress tests.
 
 Validate the full paper pipeline without launching the expensive runs:
 
@@ -122,6 +132,9 @@ Run branch-level ablations for the regime-adaptive ensemble:
 ```bash
 uv run python -m experiments.ablation_study --config configs/benchmark_full.json
 ```
+
+Use `configs/benchmark_frontier.json` with the same command to run ablations on
+the harder suite.
 
 Run seed-level policy comparisons:
 
@@ -200,6 +213,9 @@ The default benchmark compares:
 
 The key comparison is static risk objectives versus state-adaptive risk
 objectives under changing bankroll and task constraints.
+
+`configs/benchmark_full.json` uses the standard six-task suite. `configs/benchmark_frontier.json`
+uses the expanded suite for robustness claims.
 
 ## Benchmark Metrics
 

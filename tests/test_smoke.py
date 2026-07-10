@@ -5,7 +5,7 @@ from risk_preference_inference.active_query import select_informative_states
 from risk_preference_inference.benchmark import run_benchmark
 from risk_preference_inference.benchmark import EpisodeResult, summarize_results
 from risk_preference_inference.envs import RiskTask
-from risk_preference_inference.envs import benchmark_tasks, target_family_split
+from risk_preference_inference.envs import benchmark_tasks, frontier_benchmark_tasks, target_family_split
 from risk_preference_inference.evaluation import evaluate
 from risk_preference_inference.multiround_distributions import final_bankroll_distribution
 from risk_preference_inference.objectives import mean
@@ -98,6 +98,22 @@ class SmokeTests(unittest.TestCase):
         self.assertTrue(summaries)
         self.assertTrue(all(summary.episodes == 2 for summary in summaries))
 
+    def test_frontier_benchmark_suite_adds_stress_tasks(self):
+        standard_names = {task.name for task in benchmark_tasks()}
+        frontier_tasks = frontier_benchmark_tasks()
+        frontier_names = {task.name for task in frontier_tasks}
+        self.assertGreater(len(frontier_names), len(standard_names))
+        self.assertTrue(standard_names <= frontier_names)
+        self.assertIn("RiskBlackjack-HiddenDeckShift-v0", frontier_names)
+        self.assertIn("RiskBlackjack-NearRuinHighBet-v0", frontier_names)
+        self.assertTrue(any(task.episode_card_regimes is not None for task in frontier_tasks))
+
+    def test_hidden_regime_task_runs(self):
+        task = next(task for task in frontier_benchmark_tasks() if task.name == "RiskBlackjack-HiddenDeckShift-v0")
+        episodes, summaries = run_benchmark(tasks=[task], policies=core_policies()[:2], episodes=2, seed=17, hand_depth=1)
+        self.assertEqual(len(episodes), 4)
+        self.assertEqual(len(summaries), 2)
+
     def test_exact_multiround_distribution(self):
         task = RiskTask(name="exact-test", rounds=1, initial_bankroll=120, target_bankroll=160)
         distribution = final_bankroll_distribution(task, core_policies()[1], rounds=1, hand_depth=1, grid=20)
@@ -138,10 +154,34 @@ class SmokeTests(unittest.TestCase):
 
     def test_signed_regime_uses_learned_delegate_for_target_task(self):
         task = RiskTask(name="target-regime", rounds=30, initial_bankroll=500, target_bankroll=640)
-        state = DecisionState((10, 6), 10, current_bankroll=500, initial_bankroll=500, target_bankroll=640)
+        state = DecisionState((10, 6), 10, current_bankroll=540, initial_bankroll=500, target_bankroll=640)
         policy = signed_regime_learned_policy()
         delegate = policy._delegate(state, task, rounds_remaining=30, peak_bankroll=500)
         self.assertIn("target_delegate", delegate.name)
+
+    def test_signed_regime_uses_mean_delegate_for_far_target_task(self):
+        task = RiskTask(name="target-regime", rounds=30, initial_bankroll=500, target_bankroll=640)
+        state = DecisionState((10, 6), 10, current_bankroll=500, initial_bankroll=500, target_bankroll=640)
+        policy = signed_regime_learned_policy()
+        delegate = policy._delegate(state, task, rounds_remaining=30, peak_bankroll=500)
+        self.assertIn("mean_mixture", delegate.name)
+
+    def test_signed_regime_uses_basic_delegate_for_frontier_stress_tasks(self):
+        policy = signed_regime_learned_policy()
+        severe_task = next(task for task in frontier_benchmark_tasks() if task.name == "RiskBlackjack-NearRuinHighBet-v0")
+        severe_state = DecisionState((10, 6), 10, current_bankroll=180, initial_bankroll=180, bet=40, target_bankroll=340)
+        severe_delegate = policy._delegate(severe_state, severe_task, rounds_remaining=20, peak_bankroll=180)
+        self.assertIn("severe_ruin_basic", severe_delegate.name)
+
+        long_drawdown_task = next(task for task in frontier_benchmark_tasks() if task.name == "RiskBlackjack-LongHorizonTightDrawdown-v0")
+        drawdown_state = DecisionState((10, 6), 10, current_bankroll=500, initial_bankroll=500, target_bankroll=760)
+        drawdown_delegate = policy._delegate(drawdown_state, long_drawdown_task, rounds_remaining=60, peak_bankroll=500)
+        self.assertIn("long_drawdown_basic", drawdown_delegate.name)
+
+        short_target_task = next(task for task in frontier_benchmark_tasks() if task.name == "RiskBlackjack-TightTargetShortHorizon-v0")
+        short_target_state = DecisionState((10, 6), 10, current_bankroll=500, initial_bankroll=500, bet=30, target_bankroll=650)
+        short_target_delegate = policy._delegate(short_target_state, short_target_task, rounds_remaining=12, peak_bankroll=500)
+        self.assertIn("short_target_basic", short_target_delegate.name)
 
     def test_target_branch_searched_policy_scores(self):
         task = RiskTask(name="target-branch-test", rounds=3, initial_bankroll=120, target_bankroll=160)
