@@ -1,8 +1,8 @@
 # Experiments
 
-For the exact commands used by the current paper figures and confirmation
-tables, see [`paper_reproduction.md`](paper_reproduction.md). This page keeps
-the broader experiment command reference.
+For the exact commands used by the locked benchmark runs, see
+[`reproduction.md`](reproduction.md). This page keeps the broader experiment
+command reference.
 
 Smoke benchmark:
 

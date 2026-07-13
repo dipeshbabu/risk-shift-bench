@@ -7,21 +7,8 @@ decision-inference utilities used for synthetic and human hit/stand data.
 
 The central research question is whether risk sensitivity should be static or
 state-adaptive in sequential decision problems with ruin, target, drawdown, and
-distribution-shift constraints.
-
-Current main result: a robust searched-fallback lower-confidence selector
-trained only on pre-confirmation score caches improves over both
-`signed_regime_learned_ensemble` and `learned_mixture_searched` on two fresh
-confirmation splits. On `frontier_confirmation_audit`, it scores 377.98 versus
-371.33 for searched mixture and 373.47 for signed-regime. On
-`frontier_confirmation_audit_v2`, it scores 376.23 versus 374.80 for searched
-mixture and 367.71 for signed-regime. On the second environment family,
-`portfolio_confirmation`, it scores 1661.68 versus 1607.11 for searched mixture
-and 1366.70 for signed-regime.
-
-The exact paper reproduction commands are in
-[`docs/paper_reproduction.md`](docs/paper_reproduction.md). The manuscript keeps
-protocol details in prose; run commands live in the repository.
+distribution-shift constraints. Reproduction commands for the locked benchmark
+protocol are in [`docs/reproduction.md`](docs/reproduction.md).
 
 ## Repository Contents
 
@@ -98,10 +85,9 @@ uv run python -m experiments.risk_benchmark --config configs/benchmark_frontier.
 
 The frontier suite extends the standard benchmark with extreme deck shifts,
 hidden per-episode regime mixtures, near-ruin high-bet episodes, tight target
-horizons, and long-horizon drawdown stress tests. For paper claims, use the
-locked protocol: develop on `frontier_dev`, use `frontier_holdout` for
-diagnostic generalization checks, and reserve `frontier_audit` for fresh
-post-change audit runs.
+horizons, and long-horizon drawdown stress tests. For locked evaluations,
+develop on `frontier_dev`, use `frontier_holdout` for diagnostic generalization
+checks, and reserve audit/confirmation splits for post-freeze evaluation.
 
 ```bash
 uv run python -m experiments.frontier_protocol \
@@ -215,13 +201,13 @@ uv run python -m experiments.portfolio_lcb_selector \
   --out-dir artifacts/portfolio_lcb_selector
 ```
 
-Validate the full paper pipeline without launching the expensive runs:
+Validate the full artifact pipeline without launching the expensive runs:
 
 ```bash
 uv run python -m experiments.validate_pipeline
 ```
 
-Run the full paper artifact pipeline:
+Run the full artifact pipeline:
 
 ```bash
 uv run python -m experiments.run_paper_pipeline

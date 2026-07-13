@@ -15,6 +15,7 @@ reports/
 plots/
 docs/results.md
 paper/
+paper*.zip
 *.svg
 *.pdf
 *.pkl

@@ -1,7 +1,7 @@
-# Paper reproduction commands
+# Reproduction commands
 
-This file contains the run commands used for the paper artifacts. The paper
-itself describes the protocol and results; execution details live here.
+This file contains the run commands for the locked benchmark artifacts. The
+repository documentation keeps execution details separate from the manuscript.
 
 All commands assume dependencies were installed with:
 
@@ -12,8 +12,8 @@ uv sync
 ## Pre-confirmation Blackjack score caches
 
 The robust Blackjack selectors consume cached scores from development, holdout,
-audit, final-audit, and blind-audit work. The paper artifacts expect these
-cache paths:
+audit, final-audit, and blind-audit work. The locked runs expect these cache
+paths:
 
 ```text
 artifacts/meta_selector_confirmation_5seed_v1/selection_train_scores.csv
@@ -81,7 +81,7 @@ uv run python -m experiments.cached_lcb_selector \
 
 ## Robust searched-fallback lower-confidence selector
 
-These are the main Blackjack paper commands. The fallback is
+These are the main Blackjack robust fallback commands. The fallback is
 `learned_mixture_searched`; harmful promotions are penalized during
 pre-confirmation selector search.
 
@@ -165,13 +165,3 @@ uv run python -m experiments.portfolio_lcb_selector \
   --episodes 100 \
   --out-dir artifacts/portfolio_lcb_selector_confirmation_5seed_100ep_v1
 ```
-
-## Paper figures
-
-Regenerate the paper figures after the artifacts above exist:
-
-```bash
-uv run python paper/scripts/make_figures.py
-```
-
-The generated files are written to `paper/figures/` as both PDF and SVG.
