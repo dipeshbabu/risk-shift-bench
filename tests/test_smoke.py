@@ -5,8 +5,45 @@ from risk_preference_inference.active_query import select_informative_states
 from risk_preference_inference.benchmark import run_benchmark
 from risk_preference_inference.benchmark import EpisodeResult, summarize_results
 from risk_preference_inference.envs import RiskTask
-from risk_preference_inference.envs import benchmark_tasks, frontier_benchmark_tasks, target_family_split
+from risk_preference_inference.envs import (
+    benchmark_tasks,
+    frontier_blind_audit_tasks,
+    frontier_audit_tasks,
+    frontier_confirmation_audit_tasks,
+    frontier_confirmation_audit_v2_tasks,
+    frontier_benchmark_tasks,
+    frontier_development_tasks,
+    frontier_final_audit_tasks,
+    frontier_holdout_tasks,
+    target_family_split,
+)
 from risk_preference_inference.evaluation import evaluate
+from risk_preference_inference.family_selector import (
+    FamilyPromotionParams,
+    FamilyPromotionPolicy,
+    learn_family_promotions,
+    task_family,
+)
+from risk_preference_inference.incumbent_switch import (
+    incumbent_switch_candidates,
+    incumbent_switch_policy,
+    search_incumbent_switch,
+)
+from risk_preference_inference.lcb_selector import (
+    LCBSelectorParams,
+    LowerConfidenceSelectorPolicy,
+    profiles_from_scores as lcb_profiles_from_scores,
+    risk_adjusted_validation_score,
+    search_lcb_selector,
+)
+from risk_preference_inference.meta_selector import (
+    AdvantageKnnMetaPolicy,
+    MetaSelectorProfile,
+    MetaSelectorParams,
+    build_profiles,
+    search_meta_selector,
+    search_meta_selector_cv,
+)
 from risk_preference_inference.multiround_distributions import final_bankroll_distribution
 from risk_preference_inference.objectives import mean
 from risk_preference_inference.policy_registry import (
@@ -15,9 +52,29 @@ from risk_preference_inference.policy_registry import (
     learned_mixture_policy,
     searched_learned_mixture_policy,
     signed_regime_learned_policy,
+    state_action_blend_policy,
     state_adaptive_utility_policy,
     target_branch_searched_policy,
     strong_baseline_grid,
+)
+from risk_preference_inference.portfolio_benchmark import (
+    PortfolioState,
+    portfolio_policy_grid,
+    run_portfolio_benchmark,
+)
+from risk_preference_inference.portfolio_envs import (
+    PortfolioTask,
+    portfolio_audit_tasks,
+    portfolio_confirmation_tasks,
+    portfolio_development_tasks,
+    portfolio_holdout_tasks,
+    portfolio_tasks,
+)
+from risk_preference_inference.portfolio_lcb_selector import (
+    PortfolioLCBParams,
+    PortfolioLCBSelectorPolicy,
+    profiles_from_scores as portfolio_lcb_profiles_from_scores,
+    search_portfolio_lcb_selector,
 )
 from risk_preference_inference.adaptive_search import search_adaptive_utility_policy, search_learned_mixture_policy
 from risk_preference_inference.ablations import run_ablation_study
@@ -25,12 +82,25 @@ from risk_preference_inference.multiseed import paired_policy_deltas, run_multis
 from risk_preference_inference.toy_envs import run_toy_benchmark
 from risk_preference_inference.run_management import paper_run_paths, required_artifacts
 from risk_preference_inference.policy import action_probabilities
+from risk_preference_inference.portfolio_selector import (
+    PortfolioProfile,
+    PortfolioSelectorParams,
+    TaskFeaturePortfolioPolicy,
+    search_portfolio_selector,
+    task_features,
+)
 from risk_preference_inference.risk_models import (
     CumulativeProspectModel,
     EntropicRiskModel,
     ExpectedValueModel,
     OptimizedCertaintyEquivalentModel,
     ProspectUtilityModel,
+)
+from risk_preference_inference.robust_gate_search import robust_gate_candidate_params, robust_gate_policy, search_robust_gate
+from risk_preference_inference.state_action_blend_search import (
+    search_state_action_blend,
+    state_action_blend_candidates,
+    state_action_blend_from_params,
 )
 from risk_preference_inference.splits import make_split
 from risk_preference_inference.synthetic import generate_synthetic_records
@@ -98,6 +168,61 @@ class SmokeTests(unittest.TestCase):
         self.assertTrue(summaries)
         self.assertTrue(all(summary.episodes == 2 for summary in summaries))
 
+    def test_portfolio_benchmark_runs(self):
+        task = PortfolioTask(name="portfolio-test", periods=3, initial_capital=1000, target_capital=1040, ruin_capital=800)
+        episodes, summaries = run_portfolio_benchmark(tasks=[task], policies=portfolio_policy_grid()[:3], episodes=2, seed=3)
+        self.assertEqual(len(episodes), 6)
+        self.assertEqual(len(summaries), 3)
+        self.assertTrue(all(summary.episodes == 2 for summary in summaries))
+
+    def test_portfolio_splits_are_locked_and_disjoint(self):
+        dev = {task.name for task in portfolio_development_tasks()}
+        holdout = {task.name for task in portfolio_holdout_tasks()}
+        audit = {task.name for task in portfolio_audit_tasks()}
+        confirmation = {task.name for task in portfolio_confirmation_tasks()}
+        self.assertTrue(dev)
+        self.assertTrue(holdout)
+        self.assertTrue(audit)
+        self.assertTrue(confirmation)
+        self.assertFalse(dev & holdout)
+        self.assertFalse(dev & audit)
+        self.assertFalse(dev & confirmation)
+        self.assertFalse(holdout & audit)
+        self.assertFalse(holdout & confirmation)
+        self.assertFalse(audit & confirmation)
+        self.assertEqual({task.name for task in portfolio_tasks("portfolio")}, dev | holdout | audit | confirmation)
+
+    def test_portfolio_lcb_selector_promotes_positive_neighbor(self):
+        task = PortfolioTask(name="portfolio-lcb", periods=2, initial_capital=1000, target_capital=1040)
+        params = PortfolioLCBParams(k=1, min_evidence=1, lcb_scale=0.0, margin=0.0)
+        scores = {
+            task.name: {
+                "learned_mixture_searched": 10.0,
+                "signed_regime_learned_ensemble": 15.0,
+            }
+        }
+        profiles = portfolio_lcb_profiles_from_scores([task], scores)
+        policy = PortfolioLCBSelectorPolicy(profiles, params)
+        state = PortfolioState(capital=1000, initial_capital=1000, peak_capital=1000, periods_remaining=2)
+        self.assertEqual(policy.selected_policy_name(task), "signed_regime_learned_ensemble")
+        self.assertGreaterEqual(policy.allocation(state, task), 0.0)
+
+    def test_portfolio_lcb_search_runs(self):
+        tasks = [
+            PortfolioTask(name="portfolio-lcb-a", periods=2, initial_capital=1000, target_capital=1040),
+            PortfolioTask(name="portfolio-lcb-b", periods=3, initial_capital=900, target_capital=1010),
+        ]
+        scores = {
+            task.name: {
+                "learned_mixture_searched": 10.0,
+                "signed_regime_learned_ensemble": 12.0,
+            }
+            for task in tasks
+        }
+        result = search_portfolio_lcb_selector(tasks, scores, smoke=True)
+        self.assertTrue(result.train_profiles)
+        self.assertTrue(result.validation_summaries)
+
     def test_frontier_benchmark_suite_adds_stress_tasks(self):
         standard_names = {task.name for task in benchmark_tasks()}
         frontier_tasks = frontier_benchmark_tasks()
@@ -107,6 +232,70 @@ class SmokeTests(unittest.TestCase):
         self.assertIn("RiskBlackjack-HiddenDeckShift-v0", frontier_names)
         self.assertIn("RiskBlackjack-NearRuinHighBet-v0", frontier_names)
         self.assertTrue(any(task.episode_card_regimes is not None for task in frontier_tasks))
+
+    def test_frontier_dev_holdout_split_is_locked_and_disjoint(self):
+        dev_names = {task.name for task in frontier_development_tasks()}
+        holdout_names = {task.name for task in frontier_holdout_tasks()}
+        audit_names = {task.name for task in frontier_audit_tasks()}
+        final_audit_names = {task.name for task in frontier_final_audit_tasks()}
+        blind_audit_names = {task.name for task in frontier_blind_audit_tasks()}
+        confirmation_audit_names = {task.name for task in frontier_confirmation_audit_tasks()}
+        confirmation_audit_v2_names = {task.name for task in frontier_confirmation_audit_v2_tasks()}
+        full_names = {task.name for task in benchmark_tasks("frontier")}
+        self.assertTrue(dev_names)
+        self.assertTrue(holdout_names)
+        self.assertTrue(audit_names)
+        self.assertTrue(final_audit_names)
+        self.assertTrue(blind_audit_names)
+        self.assertTrue(confirmation_audit_names)
+        self.assertTrue(confirmation_audit_v2_names)
+        self.assertFalse(dev_names & holdout_names)
+        self.assertFalse(dev_names & audit_names)
+        self.assertFalse(dev_names & final_audit_names)
+        self.assertFalse(dev_names & blind_audit_names)
+        self.assertFalse(dev_names & confirmation_audit_names)
+        self.assertFalse(dev_names & confirmation_audit_v2_names)
+        self.assertFalse(holdout_names & audit_names)
+        self.assertFalse(holdout_names & final_audit_names)
+        self.assertFalse(holdout_names & blind_audit_names)
+        self.assertFalse(holdout_names & confirmation_audit_names)
+        self.assertFalse(holdout_names & confirmation_audit_v2_names)
+        self.assertFalse(audit_names & final_audit_names)
+        self.assertFalse(audit_names & blind_audit_names)
+        self.assertFalse(audit_names & confirmation_audit_names)
+        self.assertFalse(audit_names & confirmation_audit_v2_names)
+        self.assertFalse(final_audit_names & blind_audit_names)
+        self.assertFalse(final_audit_names & confirmation_audit_names)
+        self.assertFalse(final_audit_names & confirmation_audit_v2_names)
+        self.assertFalse(blind_audit_names & confirmation_audit_names)
+        self.assertFalse(blind_audit_names & confirmation_audit_v2_names)
+        self.assertFalse(confirmation_audit_names & confirmation_audit_v2_names)
+        self.assertEqual(
+            full_names,
+            dev_names
+            | holdout_names
+            | audit_names
+            | final_audit_names
+            | blind_audit_names
+            | confirmation_audit_names
+            | confirmation_audit_v2_names,
+        )
+        self.assertTrue(all("Holdout" in name for name in holdout_names))
+        self.assertTrue(all("Audit" in name for name in audit_names))
+        self.assertTrue(all("FinalAudit" in name for name in final_audit_names))
+        self.assertTrue(all("BlindAudit" in name for name in blind_audit_names))
+        self.assertTrue(all("Confirm" in name for name in confirmation_audit_names))
+        self.assertTrue(all("ConfirmV2" in name for name in confirmation_audit_v2_names))
+        self.assertEqual({task.name for task in benchmark_tasks("frontier_final_audit")}, final_audit_names)
+        self.assertEqual({task.name for task in benchmark_tasks("frontier_blind_audit")}, blind_audit_names)
+        self.assertEqual(
+            {task.name for task in benchmark_tasks("frontier_confirmation_audit")},
+            confirmation_audit_names,
+        )
+        self.assertEqual(
+            {task.name for task in benchmark_tasks("frontier_confirmation_audit_v2")},
+            confirmation_audit_v2_names,
+        )
 
     def test_hidden_regime_task_runs(self):
         task = next(task for task in frontier_benchmark_tasks() if task.name == "RiskBlackjack-HiddenDeckShift-v0")
@@ -182,6 +371,325 @@ class SmokeTests(unittest.TestCase):
         short_target_state = DecisionState((10, 6), 10, current_bankroll=500, initial_bankroll=500, bet=30, target_bankroll=650)
         short_target_delegate = policy._delegate(short_target_state, short_target_task, rounds_remaining=12, peak_bankroll=500)
         self.assertIn("short_target_basic", short_target_delegate.name)
+
+    def test_signed_regime_prioritizes_holdout_uncertainty_gates(self):
+        policy = signed_regime_learned_policy()
+        holdout_tasks = {task.name: task for task in frontier_holdout_tasks()}
+
+        hidden_drawdown = holdout_tasks["RiskBlackjack-HoldoutVolatileHiddenTarget-v0"]
+        hidden_drawdown_state = DecisionState((10, 6), 10, current_bankroll=460, initial_bankroll=460, bet=30, target_bankroll=680)
+        hidden_drawdown_delegate = policy._delegate(hidden_drawdown_state, hidden_drawdown, rounds_remaining=28, peak_bankroll=460)
+        self.assertIn("hidden_drawdown_oce", hidden_drawdown_delegate.name)
+
+        long_hidden = holdout_tasks["RiskBlackjack-HoldoutBalancedHiddenLong-v0"]
+        long_hidden_state = DecisionState((10, 6), 10, current_bankroll=520, initial_bankroll=520, bet=25, target_bankroll=790)
+        long_hidden_delegate = policy._delegate(long_hidden_state, long_hidden, rounds_remaining=55, peak_bankroll=520)
+        self.assertIn("hidden_long_mean", long_hidden_delegate.name)
+
+        shifted_drawdown = holdout_tasks["RiskBlackjack-HoldoutTenDepletedDrawdown-v0"]
+        shifted_drawdown_state = DecisionState((10, 6), 10, current_bankroll=500, initial_bankroll=500, bet=25, target_bankroll=720)
+        shifted_drawdown_delegate = policy._delegate(shifted_drawdown_state, shifted_drawdown, rounds_remaining=45, peak_bankroll=500)
+        self.assertIn("long_shift_drawdown_mean", shifted_drawdown_delegate.name)
+
+        near_ruin_shift = holdout_tasks["RiskBlackjack-HoldoutExtremeHighRuin-v0"]
+        near_ruin_state = DecisionState((10, 6), 10, current_bankroll=260, initial_bankroll=260, bet=40, target_bankroll=620)
+        near_ruin_delegate = policy._delegate(near_ruin_state, near_ruin_shift, rounds_remaining=30, peak_bankroll=260)
+        self.assertIn("near_ruin_oce", near_ruin_delegate.name)
+
+    def test_state_action_blend_policy_scores(self):
+        task = RiskTask(name="blend-test", rounds=20, initial_bankroll=180, bet=40, target_bankroll=340, ruin_bankroll=40)
+        state = DecisionState((10, 6), 10, current_bankroll=180, initial_bankroll=180, bet=40, target_bankroll=340)
+        probs = state_action_blend_policy().action_probabilities(state, task, rounds_remaining=20, hand_depth=1)
+        self.assertEqual(set(probs), {"hit", "stand"})
+        self.assertLess(abs(sum(probs.values()) - 1.0), 1e-9)
+        self.assertTrue(all(0.0 <= value <= 1.0 for value in probs.values()))
+
+    def test_state_action_blend_candidate_policy_scores(self):
+        params = state_action_blend_candidates(smoke=True)[0]
+        policy = state_action_blend_from_params(params)
+        task = RiskTask(name="blend-candidate", rounds=3, initial_bankroll=120, bet=20, target_bankroll=150)
+        state = DecisionState((10, 6), 10, current_bankroll=120, initial_bankroll=120, bet=20, target_bankroll=150)
+        probs = policy.action_probabilities(state, task, rounds_remaining=3, hand_depth=1)
+        self.assertEqual(set(probs), {"hit", "stand"})
+        self.assertLess(abs(sum(probs.values()) - 1.0), 1e-9)
+
+    def test_state_action_blend_search_runs(self):
+        validation_task = RiskTask(name="blend-validation", rounds=2, initial_bankroll=140, bet=20, target_bankroll=170)
+        result = search_state_action_blend(
+            validation_tasks=[validation_task],
+            seeds=[0],
+            episodes=1,
+            hand_depth=1,
+            smoke=True,
+        )
+        self.assertTrue(result.validation_summaries)
+        self.assertTrue(result.candidate_scores)
+        self.assertIsInstance(result.validation_score, float)
+
+    def test_incumbent_switch_policy_scores(self):
+        params = incumbent_switch_candidates(smoke=True)[0]
+        policy = incumbent_switch_policy(params)
+        task = RiskTask(name="switch-policy", rounds=3, initial_bankroll=120, bet=20, target_bankroll=150)
+        state = DecisionState((10, 6), 10, current_bankroll=120, initial_bankroll=120, bet=20, target_bankroll=150)
+        probs = policy.action_probabilities(state, task, rounds_remaining=3, hand_depth=1)
+        self.assertEqual(set(probs), {"hit", "stand"})
+        self.assertLess(abs(sum(probs.values()) - 1.0), 1e-9)
+
+    def test_incumbent_switch_search_runs(self):
+        validation_task = RiskTask(name="switch-validation", rounds=2, initial_bankroll=140, bet=20, target_bankroll=170)
+        result = search_incumbent_switch(
+            validation_tasks=[validation_task],
+            seeds=[0],
+            episodes=1,
+            hand_depth=1,
+            smoke=True,
+        )
+        self.assertTrue(result.validation_summaries)
+        self.assertTrue(result.candidate_scores)
+        self.assertIsInstance(result.validation_score, float)
+
+    def test_advantage_knn_meta_selector_runs(self):
+        task = RiskTask(name="meta-train", rounds=2, initial_bankroll=120, bet=20, target_bankroll=150)
+        params = MetaSelectorParams(k=1)
+        profiles, rows = build_profiles(tasks=[task], seeds=[0], episodes=1, hand_depth=1, params=params)
+        self.assertTrue(rows)
+        self.assertTrue(profiles)
+        policy = AdvantageKnnMetaPolicy(profiles=profiles, params=params)
+        state = DecisionState((10, 6), 10, current_bankroll=120, initial_bankroll=120, bet=20, target_bankroll=150)
+        probs = policy.action_probabilities(state, task, rounds_remaining=2, hand_depth=1)
+        self.assertEqual(set(probs), {"hit", "stand"})
+
+    def test_meta_selector_pairwise_guard_falls_back_on_unstable_advantage(self):
+        task = RiskTask(name="meta-guard", rounds=2, initial_bankroll=120, bet=20, target_bankroll=150)
+        params = MetaSelectorParams(
+            k=2,
+            temperature=10.0,
+            pairwise_regret_penalty=1.0,
+            fallback_policy="signed_regime_learned_ensemble",
+        )
+        profiles = [
+            MetaSelectorProfile(
+                task="neighbor-good",
+                features=(0.0,) * 12,
+                policy_scores={},
+                policy_advantages={"signed_regime_learned_ensemble": 0.0, "learned_mixture_default": 12.0},
+            ),
+            MetaSelectorProfile(
+                task="neighbor-bad",
+                features=(1.0,) * 12,
+                policy_scores={},
+                policy_advantages={"signed_regime_learned_ensemble": 0.0, "learned_mixture_default": -8.0},
+            ),
+        ]
+        policy = AdvantageKnnMetaPolicy(profiles=profiles, params=params)
+        self.assertEqual(policy.selected_policy_name(task), "signed_regime_learned_ensemble")
+
+    def test_family_promotion_selector_scores(self):
+        task = RiskTask(name="family-policy", rounds=2, initial_bankroll=120, bet=20, target_bankroll=150)
+        params = FamilyPromotionParams(family_delegates={"default": "expected_value"})
+        policy = FamilyPromotionPolicy(params=params)
+        state = DecisionState((10, 6), 10, current_bankroll=120, initial_bankroll=120, bet=20, target_bankroll=150)
+        self.assertEqual(policy.selected_policy_name(task), "expected_value")
+        probs = policy.action_probabilities(state, task, rounds_remaining=2, hand_depth=1)
+        self.assertEqual(set(probs), {"hit", "stand"})
+
+    def test_family_promotion_learning_uses_signed_fallback(self):
+        task = RiskTask(name="family-learn", rounds=2, initial_bankroll=120, bet=20, target_bankroll=150)
+        scores = {
+            task.name: {
+                "signed_regime_learned_ensemble": 10.0,
+                "expected_value": 14.0,
+            }
+        }
+        params = learn_family_promotions(tasks=[task], scores_by_task=scores, candidate_policies=["expected_value"])
+        self.assertEqual(task_family(task), "default")
+        self.assertEqual(params.family_delegates["default"], "expected_value")
+
+    def test_lower_confidence_selector_promotes_positive_neighbor(self):
+        task = RiskTask(name="lcb-task", rounds=2, initial_bankroll=120, bet=20, target_bankroll=150)
+        params = LCBSelectorParams(k=1, min_evidence=1, lcb_scale=0.0)
+        scores = {
+            task.name: {
+                "signed_regime_learned_ensemble": 10.0,
+                "expected_value": 15.0,
+            }
+        }
+        profiles = lcb_profiles_from_scores([task], scores, params)
+        policy = LowerConfidenceSelectorPolicy(profiles, params)
+        self.assertEqual(policy.selected_policy_name(task), "expected_value")
+
+    def test_lower_confidence_selector_requires_all_comparison_baselines(self):
+        task = RiskTask(name="lcb-dual-baseline", rounds=2, initial_bankroll=120, bet=20, target_bankroll=150)
+        params = LCBSelectorParams(
+            k=1,
+            min_evidence=1,
+            lcb_scale=0.0,
+            margin=0.0,
+            comparison_policies=("signed_regime_learned_ensemble", "learned_mixture_searched"),
+        )
+        scores = {
+            task.name: {
+                "signed_regime_learned_ensemble": 10.0,
+                "learned_mixture_searched": 20.0,
+                "expected_value": 15.0,
+            }
+        }
+        profiles = lcb_profiles_from_scores([task], scores, params)
+        policy = LowerConfidenceSelectorPolicy(profiles, params)
+        self.assertEqual(policy.selected_policy_name(task), "learned_mixture_searched")
+
+    def test_lower_confidence_selector_search_runs(self):
+        tasks = [
+            RiskTask(name="lcb-a", rounds=2, initial_bankroll=120, bet=20, target_bankroll=150),
+            RiskTask(name="lcb-b", rounds=3, initial_bankroll=140, bet=20, target_bankroll=180),
+        ]
+        scores = {
+            task.name: {
+                "signed_regime_learned_ensemble": 10.0,
+                "expected_value": 11.0,
+            }
+            for task in tasks
+        }
+        result = search_lcb_selector(tasks=tasks, scores_by_task=scores, smoke=True)
+        self.assertTrue(result.train_profiles)
+        self.assertTrue(result.validation_summaries)
+
+    def test_lcb_risk_adjusted_validation_penalizes_harmful_promotions(self):
+        rows = [
+            {
+                "selected_policy": "expected_value",
+                "fallback_policy": "signed_regime_learned_ensemble",
+                "delta_vs_fallback": -4.0,
+            },
+            {
+                "selected_policy": "signed_regime_learned_ensemble",
+                "fallback_policy": "signed_regime_learned_ensemble",
+                "delta_vs_fallback": 0.0,
+            },
+        ]
+        self.assertLess(
+            risk_adjusted_validation_score(
+                validation_score=100.0,
+                validation_rows=rows,
+                promotion_loss_weight=1.0,
+                worst_loss_weight=0.5,
+            ),
+            100.0,
+        )
+
+    def test_lower_confidence_selector_robust_search_runs(self):
+        tasks = [
+            RiskTask(name="lcb-robust-a", rounds=2, initial_bankroll=120, bet=20, target_bankroll=150),
+            RiskTask(name="lcb-robust-b", rounds=3, initial_bankroll=140, bet=20, target_bankroll=180),
+        ]
+        scores = {
+            task.name: {
+                "signed_regime_learned_ensemble": 10.0,
+                "expected_value": 11.0,
+                "fixed_oce_3": 9.0,
+            }
+            for task in tasks
+        }
+        result = search_lcb_selector(tasks=tasks, scores_by_task=scores, smoke=True, robust_selection=True)
+        self.assertTrue(result.train_profiles)
+        self.assertTrue(result.candidate_scores)
+
+    def test_meta_selector_search_runs(self):
+        train_task = RiskTask(name="meta-train", rounds=2, initial_bankroll=120, bet=20, target_bankroll=150)
+        validation_task = RiskTask(name="meta-validation", rounds=2, initial_bankroll=140, bet=20, target_bankroll=170)
+        result = search_meta_selector(
+            train_tasks=[train_task],
+            validation_tasks=[validation_task],
+            seeds=[0],
+            episodes=1,
+            hand_depth=1,
+            smoke=True,
+        )
+        self.assertTrue(result.train_profiles)
+        self.assertTrue(result.validation_summaries)
+
+    def test_meta_selector_cv_search_runs(self):
+        tasks = [
+            RiskTask(name="meta-cv-a", rounds=2, initial_bankroll=120, bet=20, target_bankroll=150),
+            RiskTask(name="meta-cv-b", rounds=3, initial_bankroll=140, bet=20, target_bankroll=180),
+        ]
+        result = search_meta_selector_cv(
+            tasks=tasks,
+            seeds=[0],
+            episodes=1,
+            hand_depth=1,
+            smoke=True,
+        )
+        self.assertTrue(result.train_profiles)
+        self.assertTrue(result.validation_summaries)
+
+    def test_robust_gate_candidate_policy_scores(self):
+        params = robust_gate_candidate_params(smoke=True)[0]
+        policy = robust_gate_policy(params)
+        task = RiskTask(name="robust-gate-test", rounds=2, initial_bankroll=120, target_bankroll=150)
+        state = DecisionState((10, 6), 10, current_bankroll=120, initial_bankroll=120, target_bankroll=150)
+        probs = policy.action_probabilities(state, task, rounds_remaining=2, hand_depth=1)
+        self.assertEqual(set(probs), {"hit", "stand"})
+
+    def test_robust_gate_search_runs(self):
+        task = RiskTask(name="robust-search-test", rounds=2, initial_bankroll=120, target_bankroll=150)
+        result = search_robust_gate(
+            train_tasks=[task],
+            seeds=[0],
+            episodes=1,
+            hand_depth=1,
+            smoke=True,
+        )
+        self.assertTrue(result.train_summaries)
+        self.assertIsInstance(result.selection_score, float)
+
+    def test_robust_gate_search_accepts_validation_tasks(self):
+        train_task = RiskTask(name="robust-search-train", rounds=2, initial_bankroll=120, target_bankroll=150)
+        validation_task = RiskTask(name="robust-search-validation", rounds=2, initial_bankroll=140, target_bankroll=170)
+        result = search_robust_gate(
+            train_tasks=[train_task],
+            validation_tasks=[validation_task],
+            seeds=[0],
+            episodes=1,
+            hand_depth=1,
+            smoke=True,
+        )
+        self.assertTrue(result.validation_summaries)
+        self.assertIsInstance(result.validation_score, float)
+
+    def test_portfolio_task_features_are_stable(self):
+        task = RiskTask(name="portfolio-features", rounds=3, initial_bankroll=120, bet=20, target_bankroll=160)
+        features = task_features(task)
+        self.assertEqual(len(features), 9)
+        self.assertTrue(all(isinstance(value, float) for value in features))
+
+    def test_task_feature_portfolio_policy_scores(self):
+        task = RiskTask(name="portfolio-policy", rounds=2, initial_bankroll=120, bet=20, target_bankroll=150)
+        params = PortfolioSelectorParams(k=1)
+        profile = PortfolioProfile(
+            task=task.name,
+            features=task_features(task, params),
+            policy="expected_value",
+            score=1.0,
+        )
+        policy = TaskFeaturePortfolioPolicy([profile], params)
+        state = DecisionState((10, 6), 10, current_bankroll=120, initial_bankroll=120, bet=20, target_bankroll=150)
+        probs = policy.action_probabilities(state, task, rounds_remaining=2, hand_depth=1)
+        self.assertEqual(set(probs), {"hit", "stand"})
+
+    def test_portfolio_selector_search_runs(self):
+        train_task = RiskTask(name="portfolio-train", rounds=2, initial_bankroll=120, bet=20, target_bankroll=150)
+        validation_task = RiskTask(name="portfolio-validation", rounds=2, initial_bankroll=140, bet=20, target_bankroll=170)
+        result = search_portfolio_selector(
+            train_tasks=[train_task],
+            validation_tasks=[validation_task],
+            seeds=[0],
+            episodes=1,
+            hand_depth=1,
+            smoke=True,
+        )
+        self.assertTrue(result.train_profiles)
+        self.assertTrue(result.validation_summaries)
 
     def test_target_branch_searched_policy_scores(self):
         task = RiskTask(name="target-branch-test", rounds=3, initial_bankroll=120, target_bankroll=160)

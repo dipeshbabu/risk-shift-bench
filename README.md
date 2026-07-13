@@ -9,6 +9,20 @@ The central research question is whether risk sensitivity should be static or
 state-adaptive in sequential decision problems with ruin, target, drawdown, and
 distribution-shift constraints.
 
+Current main result: a robust searched-fallback lower-confidence selector
+trained only on pre-confirmation score caches improves over both
+`signed_regime_learned_ensemble` and `learned_mixture_searched` on two fresh
+confirmation splits. On `frontier_confirmation_audit`, it scores 377.98 versus
+371.33 for searched mixture and 373.47 for signed-regime. On
+`frontier_confirmation_audit_v2`, it scores 376.23 versus 374.80 for searched
+mixture and 367.71 for signed-regime. On the second environment family,
+`portfolio_confirmation`, it scores 1661.68 versus 1607.11 for searched mixture
+and 1366.70 for signed-regime.
+
+The exact paper reproduction commands are in
+[`docs/paper_reproduction.md`](docs/paper_reproduction.md). The manuscript keeps
+protocol details in prose; run commands live in the repository.
+
 ## Repository Contents
 
 - `risk_preference_inference.envs`: benchmark task suites, including standard mean-return, ruin-constrained, target-reaching, drawdown, shifted-deck, hidden-regime, and tail-risk regimes.
@@ -27,6 +41,16 @@ distribution-shift constraints.
 - `risk_preference_inference.synthetic`: synthetic decision data generation.
 - `risk_preference_inference.statistics`: bootstrap confidence intervals and paired policy comparisons.
 - `risk_preference_inference.multiseed`: seed-level policy comparisons for higher-confidence evaluations.
+- `risk_preference_inference.robust_gate_search`: development-only search for signed-regime gate variants.
+- `risk_preference_inference.portfolio_selector`: task-feature policy portfolio selection across frontier tasks.
+- `risk_preference_inference.state_action_blend_search`: validation-selected per-decision blend-weight search.
+- `risk_preference_inference.incumbent_switch`: validation-selected task-regime switching between strong incumbents.
+- `risk_preference_inference.meta_selector`: learned task-feature KNN policy selection.
+- `risk_preference_inference.family_selector`: conservative family-level delegate promotion.
+- `risk_preference_inference.lcb_selector`: uncertainty-penalized lower-confidence delegate selection.
+- `risk_preference_inference.portfolio_envs`: portfolio allocation task suites with hidden market regimes, drawdown, ruin, and target constraints.
+- `risk_preference_inference.portfolio_benchmark`: portfolio simulator, policy grid, and benchmark summaries.
+- `risk_preference_inference.portfolio_lcb_selector`: lower-confidence delegate selection for the portfolio domain.
 - `risk_preference_inference.toy_envs`: non-Blackjack toy risk tasks.
 
 ## Basic Usage
@@ -74,7 +98,122 @@ uv run python -m experiments.risk_benchmark --config configs/benchmark_frontier.
 
 The frontier suite extends the standard benchmark with extreme deck shifts,
 hidden per-episode regime mixtures, near-ruin high-bet episodes, tight target
-horizons, and long-horizon drawdown stress tests.
+horizons, and long-horizon drawdown stress tests. For paper claims, use the
+locked protocol: develop on `frontier_dev`, use `frontier_holdout` for
+diagnostic generalization checks, and reserve `frontier_audit` for fresh
+post-change audit runs.
+
+```bash
+uv run python -m experiments.frontier_protocol \
+  --seeds 0,1,2 \
+  --episodes 100 \
+  --out-dir artifacts/frontier_protocol
+```
+
+Run the final audit split after freezing a method:
+
+```bash
+uv run python -m experiments.multiseed_evaluation \
+  --config configs/benchmark_frontier_final_audit.json \
+  --seeds 0,1,2 \
+  --episodes 100
+```
+
+Run the blind audit split after freezing the refined switch:
+
+```bash
+uv run python -m experiments.incumbent_switch \
+  --selected-search-summary configs/incumbent_switch_multidelegate.json \
+  --eval-seeds 0,1,2,3,4 \
+  --episodes 100 \
+  --eval-splits frontier_blind_audit
+```
+
+Run the post-freeze confirmation split without further method changes:
+
+```bash
+uv run python -m experiments.incumbent_switch \
+  --selected-search-summary configs/incumbent_switch_multidelegate.json \
+  --eval-seeds 0,1,2,3,4 \
+  --episodes 100 \
+  --eval-splits frontier_confirmation_audit
+```
+
+Train and evaluate the learned task-feature meta-selector:
+
+```bash
+uv run python -m experiments.meta_selector \
+  --cv-selection \
+  --selection-seeds 0 \
+  --eval-seeds 0,1,2,3,4 \
+  --episodes 100 \
+  --train-suite frontier_dev \
+  --validation-suite frontier_holdout \
+  --eval-splits frontier_confirmation_audit
+```
+
+Evaluate the frozen lower-confidence selector on the first confirmation split:
+
+```bash
+uv run python -m experiments.cached_lcb_selector \
+  --score-cache artifacts/meta_selector_confirmation_5seed_v1/selection_train_scores.csv \
+  --score-cache artifacts/incumbent_switch_refined_confirm_5seed_v1/frontier_audit/aggregate_scores.csv \
+  --score-cache artifacts/incumbent_switch_refined_confirm_5seed_v1/frontier_final_audit/aggregate_scores.csv \
+  --score-cache artifacts/incumbent_switch_multidelegate_blind_5seed_v1/frontier_blind_audit/aggregate_scores.csv \
+  --eval-split frontier_confirmation_audit \
+  --eval-seeds 0,1,2,3,4 \
+  --episodes 100 \
+  --hand-depth 1 \
+  --out-dir artifacts/lcb_selector_fresh_confirmation
+```
+
+Run the same frozen selector on the second confirmation split:
+
+```bash
+uv run python -m experiments.cached_lcb_selector \
+  --score-cache artifacts/meta_selector_confirmation_5seed_v1/selection_train_scores.csv \
+  --score-cache artifacts/incumbent_switch_refined_confirm_5seed_v1/frontier_audit/aggregate_scores.csv \
+  --score-cache artifacts/incumbent_switch_refined_confirm_5seed_v1/frontier_final_audit/aggregate_scores.csv \
+  --score-cache artifacts/incumbent_switch_multidelegate_blind_5seed_v1/frontier_blind_audit/aggregate_scores.csv \
+  --eval-split frontier_confirmation_audit_v2 \
+  --eval-seeds 0,1,2,3,4 \
+  --episodes 100 \
+  --hand-depth 1 \
+  --out-dir artifacts/lcb_selector_fresh_confirmation_v2
+```
+
+Run the second environment family:
+
+```bash
+uv run python -m experiments.portfolio_benchmark \
+  --suite portfolio_dev \
+  --seeds 0,1,2 \
+  --episodes 100 \
+  --out-dir artifacts/portfolio_benchmark
+```
+
+Run the portfolio confirmation split:
+
+```bash
+uv run python -m experiments.portfolio_benchmark \
+  --suite portfolio_confirmation \
+  --seeds 0,1,2,3,4 \
+  --episodes 100 \
+  --out-dir artifacts/portfolio_benchmark
+```
+
+Train and evaluate the portfolio robust fallback selector:
+
+```bash
+uv run python -m experiments.portfolio_lcb_selector \
+  --score-cache artifacts/portfolio_benchmark/portfolio_dev/aggregate_scores.csv \
+  --score-cache artifacts/portfolio_benchmark/portfolio_holdout/aggregate_scores.csv \
+  --score-cache artifacts/portfolio_benchmark/portfolio_audit/aggregate_scores.csv \
+  --eval-split portfolio_confirmation \
+  --eval-seeds 0,1,2,3,4 \
+  --episodes 100 \
+  --out-dir artifacts/portfolio_lcb_selector
+```
 
 Validate the full paper pipeline without launching the expensive runs:
 
@@ -154,6 +293,36 @@ uv run python -m experiments.target_branch_search
 The search reports a promotion gate before any candidate should replace the
 current signed-ensemble target delegate.
 
+Search a validation-selected state/action blend:
+
+```bash
+uv run python -m experiments.state_action_blend_search \
+  --selection-seeds 0 \
+  --eval-seeds 0,1 \
+  --episodes 100 \
+  --dev-validation-count 4 \
+  --eval-splits frontier_audit
+```
+
+This evaluates blend-weight candidates only on an internal `frontier_dev`
+validation split, freezes the selected policy, and then compares it with the
+standard multiseed baselines on the requested split.
+
+Search a validation-selected incumbent switch:
+
+```bash
+uv run python -m experiments.incumbent_switch \
+  --selected-search-summary configs/incumbent_switch_refined.json \
+  --eval-seeds 0,1 \
+  --episodes 100 \
+  --eval-splits frontier_audit
+```
+
+This compares small task-regime switches between the learned-mixture and
+signed-regime incumbents. It is meant to test whether frontier performance is
+limited by objective quality or by regime selection. The checked-in refined
+summary freezes the current best switch for confirmation runs.
+
 Export exact small-horizon final-bankroll distributions:
 
 ```bash
@@ -210,12 +379,25 @@ The default benchmark compares:
 - `learned_mixture_searched`
 - `regime_adaptive_ensemble`
 - `signed_regime_learned_ensemble`
+- `state_action_blend`
 
 The key comparison is static risk objectives versus state-adaptive risk
 objectives under changing bankroll and task constraints.
 
-`configs/benchmark_full.json` uses the standard six-task suite. `configs/benchmark_frontier.json`
-uses the expanded suite for robustness claims.
+`configs/benchmark_full.json` uses the standard six-task suite.
+`configs/benchmark_frontier_dev.json` is the development split, and
+`configs/benchmark_frontier_holdout.json` is the locked diagnostic split.
+`configs/benchmark_frontier_audit.json` is a fresh audit split for post-change
+generalization checks. `configs/benchmark_frontier_final_audit.json` is an
+additional held-back suite for frozen-method checks.
+`configs/benchmark_frontier_blind_audit.json` is reserved for post-freeze
+confirmation. `configs/incumbent_switch_multidelegate.json` is the current
+frozen multi-incumbent selector. `configs/benchmark_frontier_confirmation_audit.json`
+is the first post-freeze confirmation suite, and
+`configs/benchmark_frontier_confirmation_audit_v2.json` is the second
+post-method confirmation suite. `configs/benchmark_frontier.json` runs all
+frontier splits together for stress testing, but it should not be used for
+tuning and final reporting at the same time.
 
 ## Benchmark Metrics
 

@@ -15,6 +15,7 @@ from risk_preference_inference.policy_registry import (
     learned_mixture_policy,
     searched_learned_mixture_policy,
     signed_regime_learned_policy,
+    state_action_blend_policy,
     state_adaptive_utility_policy,
 )
 
@@ -31,6 +32,7 @@ def multiseed_policies() -> list[BenchmarkPolicy]:
         searched_learned_mixture_policy(),
         RegimeAdaptivePolicy(),
         signed_regime_learned_policy(),
+        state_action_blend_policy(),
     ]
 
 

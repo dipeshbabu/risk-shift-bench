@@ -48,6 +48,7 @@ def stand_payoff_distribution(
     return normalize(tuple(merged.items()))
 
 
+@lru_cache(maxsize=250_000)
 def action_payoff_distribution(
     state: DecisionState,
     action: str,
@@ -93,6 +94,7 @@ def action_payoff_distribution(
     return normalize(tuple(merged.items()))
 
 
+@lru_cache(maxsize=250_000)
 def action_bankroll_distribution(
     state: DecisionState,
     action: str,
@@ -112,4 +114,3 @@ def action_bankroll_distribution(
         peak_bankroll=peak_bankroll,
     )
     return normalize(tuple((state.current_bankroll + payoff, prob) for payoff, prob in payoffs))
-

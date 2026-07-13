@@ -105,3 +105,55 @@ def paired_policy_differences(
             )
     return output
 
+
+def paired_score_deltas(rows: list[dict], reference_policy: str, baseline_policy: str, score_field: str = "score") -> list[float]:
+    by_pair: dict[tuple[str, int], dict[str, float]] = defaultdict(dict)
+    for row in rows:
+        by_pair[(row["task"], int(row["seed"]))][row["policy"]] = float(row[score_field])
+    deltas = []
+    for values in by_pair.values():
+        if reference_policy in values and baseline_policy in values:
+            deltas.append(values[reference_policy] - values[baseline_policy])
+    return deltas
+
+
+def sign_flip_p_value(
+    deltas: list[float],
+    samples: int = 100_000,
+    seed: int = 0,
+) -> float:
+    if not deltas:
+        return float("nan")
+    observed = abs(mean(deltas))
+    if observed <= 0.0:
+        return 1.0
+    rng = random.Random(seed)
+    exceedances = 0
+    for _ in range(samples):
+        randomized = [delta if rng.random() < 0.5 else -delta for delta in deltas]
+        if abs(mean(randomized)) >= observed:
+            exceedances += 1
+    return (exceedances + 1.0) / (samples + 1.0)
+
+
+def paired_score_report(
+    rows: list[dict],
+    reference_policy: str,
+    baseline_policy: str,
+    score_field: str = "score",
+    bootstrap_samples: int = 10_000,
+    randomization_samples: int = 100_000,
+    seed: int = 0,
+) -> dict:
+    deltas = paired_score_deltas(rows, reference_policy, baseline_policy, score_field=score_field)
+    ci = bootstrap_ci(deltas, samples=bootstrap_samples, seed=seed)
+    return {
+        "reference_policy": reference_policy,
+        "baseline_policy": baseline_policy,
+        "score_field": score_field,
+        "n_pairs": len(deltas),
+        "mean_delta": ci.estimate,
+        "bootstrap_ci_low": ci.low,
+        "bootstrap_ci_high": ci.high,
+        "sign_flip_p": sign_flip_p_value(deltas, samples=randomization_samples, seed=seed),
+    }
