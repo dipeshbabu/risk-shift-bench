@@ -1,11 +1,11 @@
 import unittest
 
-from risk_preference_inference.blackjack import DecisionState
-from risk_preference_inference.active_query import select_informative_states
-from risk_preference_inference.benchmark import run_benchmark
-from risk_preference_inference.benchmark import EpisodeResult, summarize_results
-from risk_preference_inference.envs import RiskTask
-from risk_preference_inference.envs import (
+from risk_shift_bench.blackjack import DecisionState
+from risk_shift_bench.active_query import select_informative_states
+from risk_shift_bench.benchmark import run_benchmark
+from risk_shift_bench.benchmark import EpisodeResult, summarize_results
+from risk_shift_bench.envs import RiskTask
+from risk_shift_bench.envs import (
     benchmark_tasks,
     frontier_blind_audit_tasks,
     frontier_audit_tasks,
@@ -17,26 +17,26 @@ from risk_preference_inference.envs import (
     frontier_holdout_tasks,
     target_family_split,
 )
-from risk_preference_inference.evaluation import evaluate
-from risk_preference_inference.family_selector import (
+from risk_shift_bench.evaluation import evaluate
+from risk_shift_bench.family_selector import (
     FamilyPromotionParams,
     FamilyPromotionPolicy,
     learn_family_promotions,
     task_family,
 )
-from risk_preference_inference.incumbent_switch import (
+from risk_shift_bench.incumbent_switch import (
     incumbent_switch_candidates,
     incumbent_switch_policy,
     search_incumbent_switch,
 )
-from risk_preference_inference.lcb_selector import (
+from risk_shift_bench.lcb_selector import (
     LCBSelectorParams,
     LowerConfidenceSelectorPolicy,
     profiles_from_scores as lcb_profiles_from_scores,
     risk_adjusted_validation_score,
     search_lcb_selector,
 )
-from risk_preference_inference.meta_selector import (
+from risk_shift_bench.meta_selector import (
     AdvantageKnnMetaPolicy,
     MetaSelectorProfile,
     MetaSelectorParams,
@@ -44,9 +44,9 @@ from risk_preference_inference.meta_selector import (
     search_meta_selector,
     search_meta_selector_cv,
 )
-from risk_preference_inference.multiround_distributions import final_bankroll_distribution
-from risk_preference_inference.objectives import mean
-from risk_preference_inference.policy_registry import (
+from risk_shift_bench.multiround_distributions import final_bankroll_distribution
+from risk_shift_bench.objectives import mean
+from risk_shift_bench.policy_registry import (
     core_policies,
     learned_adaptive_cvar_policy,
     learned_mixture_policy,
@@ -57,12 +57,12 @@ from risk_preference_inference.policy_registry import (
     target_branch_searched_policy,
     strong_baseline_grid,
 )
-from risk_preference_inference.portfolio_benchmark import (
+from risk_shift_bench.portfolio_benchmark import (
     PortfolioState,
     portfolio_policy_grid,
     run_portfolio_benchmark,
 )
-from risk_preference_inference.portfolio_envs import (
+from risk_shift_bench.portfolio_envs import (
     PortfolioTask,
     portfolio_audit_tasks,
     portfolio_confirmation_tasks,
@@ -70,41 +70,41 @@ from risk_preference_inference.portfolio_envs import (
     portfolio_holdout_tasks,
     portfolio_tasks,
 )
-from risk_preference_inference.portfolio_lcb_selector import (
+from risk_shift_bench.portfolio_lcb_selector import (
     PortfolioLCBParams,
     PortfolioLCBSelectorPolicy,
     profiles_from_scores as portfolio_lcb_profiles_from_scores,
     search_portfolio_lcb_selector,
 )
-from risk_preference_inference.adaptive_search import search_adaptive_utility_policy, search_learned_mixture_policy
-from risk_preference_inference.ablations import run_ablation_study
-from risk_preference_inference.multiseed import paired_policy_deltas, run_multiseed_evaluation
-from risk_preference_inference.toy_envs import run_toy_benchmark
-from risk_preference_inference.run_management import paper_run_paths, required_artifacts
-from risk_preference_inference.policy import action_probabilities
-from risk_preference_inference.portfolio_selector import (
+from risk_shift_bench.adaptive_search import search_adaptive_utility_policy, search_learned_mixture_policy
+from risk_shift_bench.ablations import run_ablation_study
+from risk_shift_bench.multiseed import paired_policy_deltas, run_multiseed_evaluation
+from risk_shift_bench.toy_envs import run_toy_benchmark
+from risk_shift_bench.run_management import paper_run_paths, required_artifacts
+from risk_shift_bench.policy import action_probabilities
+from risk_shift_bench.portfolio_selector import (
     PortfolioProfile,
     PortfolioSelectorParams,
     TaskFeaturePortfolioPolicy,
     search_portfolio_selector,
     task_features,
 )
-from risk_preference_inference.risk_models import (
+from risk_shift_bench.risk_models import (
     CumulativeProspectModel,
     EntropicRiskModel,
     ExpectedValueModel,
     OptimizedCertaintyEquivalentModel,
     ProspectUtilityModel,
 )
-from risk_preference_inference.robust_gate_search import robust_gate_candidate_params, robust_gate_policy, search_robust_gate
-from risk_preference_inference.state_action_blend_search import (
+from risk_shift_bench.robust_gate_search import robust_gate_candidate_params, robust_gate_policy, search_robust_gate
+from risk_shift_bench.state_action_blend_search import (
     search_state_action_blend,
     state_action_blend_candidates,
     state_action_blend_from_params,
 )
-from risk_preference_inference.splits import make_split
-from risk_preference_inference.synthetic import generate_synthetic_records
-from risk_preference_inference.target_search import (
+from risk_shift_bench.splits import make_split
+from risk_shift_bench.synthetic import generate_synthetic_records
+from risk_shift_bench.target_search import (
     evaluate_promotion_gate,
     PromotionGateResult,
     search_target_branch_policy,

@@ -7,12 +7,12 @@ import csv
 from dataclasses import asdict
 from pathlib import Path
 
-from risk_preference_inference.adaptive_search import summary_score
-from risk_preference_inference.multiseed import aggregate_seed_scores, paired_policy_deltas
-from risk_preference_inference.portfolio_benchmark import portfolio_policy_lookup, run_portfolio_benchmark
-from risk_preference_inference.portfolio_envs import portfolio_tasks
-from risk_preference_inference.portfolio_lcb_selector import policy_from_scores, search_portfolio_lcb_selector
-from risk_preference_inference.reporting import write_json
+from risk_shift_bench.adaptive_search import summary_score
+from risk_shift_bench.multiseed import aggregate_seed_scores, paired_policy_deltas
+from risk_shift_bench.portfolio_benchmark import portfolio_policy_lookup, run_portfolio_benchmark
+from risk_shift_bench.portfolio_envs import portfolio_tasks
+from risk_shift_bench.portfolio_lcb_selector import policy_from_scores, search_portfolio_lcb_selector
+from risk_shift_bench.reporting import write_json
 
 
 def parse_suites(value: str) -> list[str]:

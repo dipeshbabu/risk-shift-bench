@@ -6,11 +6,11 @@ import argparse
 from dataclasses import asdict
 from pathlib import Path
 
-from risk_preference_inference.benchmark import run_benchmark
-from risk_preference_inference.config import load_benchmark_config
-from risk_preference_inference.envs import benchmark_suite_names, benchmark_tasks
-from risk_preference_inference.policy_registry import core_policies, strong_baseline_grid
-from risk_preference_inference.reporting import write_episode_jsonl, write_json, write_summary_csv
+from risk_shift_bench.benchmark import run_benchmark
+from risk_shift_bench.config import load_benchmark_config
+from risk_shift_bench.envs import benchmark_suite_names, benchmark_tasks
+from risk_shift_bench.policy_registry import core_policies, strong_baseline_grid
+from risk_shift_bench.reporting import write_episode_jsonl, write_json, write_summary_csv
 
 
 def main() -> None:

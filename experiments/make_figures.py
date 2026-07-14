@@ -6,7 +6,7 @@ import argparse
 import json
 from pathlib import Path
 
-from risk_preference_inference.figures import bar_chart_svg
+from risk_shift_bench.figures import bar_chart_svg
 
 
 def main() -> None:

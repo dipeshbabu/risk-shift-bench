@@ -7,7 +7,7 @@ import csv
 import json
 from pathlib import Path
 
-from risk_preference_inference.statistics import confidence_table, paired_policy_differences
+from risk_shift_bench.statistics import confidence_table, paired_policy_differences
 
 
 def load_jsonl(path: str | Path) -> list[dict]:

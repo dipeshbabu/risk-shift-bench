@@ -7,9 +7,9 @@ import csv
 from dataclasses import asdict
 from pathlib import Path
 
-from risk_preference_inference.envs import benchmark_tasks, target_family_split
-from risk_preference_inference.reporting import write_json
-from risk_preference_inference.target_search import (
+from risk_shift_bench.envs import benchmark_tasks, target_family_split
+from risk_shift_bench.reporting import write_json
+from risk_shift_bench.target_search import (
     evaluate_target_baselines,
     search_target_branch_policy,
     target_score_report,

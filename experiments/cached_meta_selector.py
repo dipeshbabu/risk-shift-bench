@@ -7,9 +7,9 @@ import csv
 from dataclasses import asdict
 from pathlib import Path
 
-from risk_preference_inference.benchmark import run_benchmark
-from risk_preference_inference.envs import benchmark_tasks
-from risk_preference_inference.meta_selector import (
+from risk_shift_bench.benchmark import run_benchmark
+from risk_shift_bench.envs import benchmark_tasks
+from risk_shift_bench.meta_selector import (
     AdvantageKnnMetaPolicy,
     cross_validated_profile_score,
     meta_selector_candidate_params,
@@ -17,9 +17,9 @@ from risk_preference_inference.meta_selector import (
     select_meta_search_result,
     MetaSelectorSearchResult,
 )
-from risk_preference_inference.multiseed import aggregate_seed_scores, paired_policy_deltas, summarize_seed
-from risk_preference_inference.policy_registry import signed_regime_learned_policy
-from risk_preference_inference.reporting import write_json
+from risk_shift_bench.multiseed import aggregate_seed_scores, paired_policy_deltas, summarize_seed
+from risk_shift_bench.policy_registry import signed_regime_learned_policy
+from risk_shift_bench.reporting import write_json
 
 
 def parse_seeds(value: str) -> list[int]:

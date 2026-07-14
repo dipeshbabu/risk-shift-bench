@@ -8,12 +8,12 @@ import json
 from dataclasses import asdict
 from pathlib import Path
 
-from risk_preference_inference.envs import benchmark_tasks
-from risk_preference_inference.multiseed import aggregate_seed_scores, paired_policy_deltas, summarize_seed
-from risk_preference_inference.benchmark import run_benchmark
-from risk_preference_inference.reporting import write_json
-from risk_preference_inference.robust_gate_search import RobustGateParams, robust_gate_policy, search_robust_gate
-from risk_preference_inference.multiseed import multiseed_policies
+from risk_shift_bench.envs import benchmark_tasks
+from risk_shift_bench.multiseed import aggregate_seed_scores, paired_policy_deltas, summarize_seed
+from risk_shift_bench.benchmark import run_benchmark
+from risk_shift_bench.reporting import write_json
+from risk_shift_bench.robust_gate_search import RobustGateParams, robust_gate_policy, search_robust_gate
+from risk_shift_bench.multiseed import multiseed_policies
 
 
 def parse_seeds(value: str) -> list[int]:

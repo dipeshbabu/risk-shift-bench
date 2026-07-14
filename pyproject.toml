@@ -1,9 +1,12 @@
 [project]
-name = "risk-preference-inference"
+name = "risk-shift-bench"
 version = "0.1.0"
-description = "Research scaffold for learning personalized risk preferences from sequential Blackjack decisions."
+description = "Locked stress tests and robust fallback selection for risk-sensitive sequential decision making."
 requires-python = ">=3.10"
 dependencies = []
+
+[project.urls]
+Repository = "https://github.com/dipeshbabu/risk-shift-bench"
 
 [build-system]
 requires = ["setuptools>=68"]

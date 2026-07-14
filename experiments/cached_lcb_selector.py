@@ -7,13 +7,13 @@ import csv
 from dataclasses import asdict
 from pathlib import Path
 
-from risk_preference_inference.benchmark import run_benchmark
-from risk_preference_inference.envs import benchmark_tasks
-from risk_preference_inference.family_selector import family_candidate_lookup
-from risk_preference_inference.lcb_selector import policy_from_scores, search_lcb_selector
-from risk_preference_inference.multiseed import aggregate_seed_scores, paired_policy_deltas, summarize_seed
-from risk_preference_inference.policy_registry import signed_regime_learned_policy
-from risk_preference_inference.reporting import write_json
+from risk_shift_bench.benchmark import run_benchmark
+from risk_shift_bench.envs import benchmark_tasks
+from risk_shift_bench.family_selector import family_candidate_lookup
+from risk_shift_bench.lcb_selector import policy_from_scores, search_lcb_selector
+from risk_shift_bench.multiseed import aggregate_seed_scores, paired_policy_deltas, summarize_seed
+from risk_shift_bench.policy_registry import signed_regime_learned_policy
+from risk_shift_bench.reporting import write_json
 
 
 def parse_suites(value: str) -> list[str]:

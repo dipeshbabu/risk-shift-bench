@@ -5,12 +5,12 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from risk_preference_inference.adaptive_search import candidate_params, mixture_candidate_params, utility_candidate_params
-from risk_preference_inference.ablations import ablation_policies
-from risk_preference_inference.config import load_adaptive_search_config, load_benchmark_config
-from risk_preference_inference.envs import available_benchmark_tasks, benchmark_suite_names, benchmark_tasks
-from risk_preference_inference.learned_adaptive_search import linear_candidates
-from risk_preference_inference.policy_registry import core_policies, strong_baseline_grid
+from risk_shift_bench.adaptive_search import candidate_params, mixture_candidate_params, utility_candidate_params
+from risk_shift_bench.ablations import ablation_policies
+from risk_shift_bench.config import load_adaptive_search_config, load_benchmark_config
+from risk_shift_bench.envs import available_benchmark_tasks, benchmark_suite_names, benchmark_tasks
+from risk_shift_bench.learned_adaptive_search import linear_candidates
+from risk_shift_bench.policy_registry import core_policies, strong_baseline_grid
 
 
 def validate_suite_name(suite: str) -> None:

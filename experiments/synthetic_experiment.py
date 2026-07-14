@@ -7,10 +7,10 @@ import json
 from dataclasses import asdict
 from pathlib import Path
 
-from risk_preference_inference.dataset import save_jsonl
-from risk_preference_inference.evaluation import evaluate
-from risk_preference_inference.fitting import fit_state_dependent_prospect, fit_static_prospect
-from risk_preference_inference.risk_models import (
+from risk_shift_bench.dataset import save_jsonl
+from risk_shift_bench.evaluation import evaluate
+from risk_shift_bench.fitting import fit_state_dependent_prospect, fit_static_prospect
+from risk_shift_bench.risk_models import (
     CVaRModel,
     CumulativeProspectModel,
     EntropicRiskModel,
@@ -19,8 +19,8 @@ from risk_preference_inference.risk_models import (
     ProspectUtilityModel,
     StateDependentProspectModel,
 )
-from risk_preference_inference.splits import make_split
-from risk_preference_inference.synthetic import generate_state_dependent_synthetic_records, generate_synthetic_records
+from risk_shift_bench.splits import make_split
+from risk_shift_bench.synthetic import generate_state_dependent_synthetic_records, generate_synthetic_records
 
 
 def main() -> None:

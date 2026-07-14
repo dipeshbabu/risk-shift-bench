@@ -7,15 +7,15 @@ import csv
 from dataclasses import asdict
 from pathlib import Path
 
-from risk_preference_inference.benchmark import run_benchmark
-from risk_preference_inference.envs import benchmark_tasks
-from risk_preference_inference.multiseed import aggregate_seed_scores, multiseed_policies, paired_policy_deltas, summarize_seed
-from risk_preference_inference.portfolio_selector import (
+from risk_shift_bench.benchmark import run_benchmark
+from risk_shift_bench.envs import benchmark_tasks
+from risk_shift_bench.multiseed import aggregate_seed_scores, multiseed_policies, paired_policy_deltas, summarize_seed
+from risk_shift_bench.portfolio_selector import (
     TaskFeaturePortfolioPolicy,
     best_policy_profiles,
     search_portfolio_selector,
 )
-from risk_preference_inference.reporting import write_json
+from risk_shift_bench.reporting import write_json
 
 
 def parse_seeds(value: str) -> list[int]:

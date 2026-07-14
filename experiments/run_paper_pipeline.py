@@ -7,8 +7,8 @@ from pathlib import Path
 import subprocess
 import sys
 
-from risk_preference_inference.config import load_adaptive_search_config, load_benchmark_config
-from risk_preference_inference.run_management import (
+from risk_shift_bench.config import load_adaptive_search_config, load_benchmark_config
+from risk_shift_bench.run_management import (
     check_artifacts,
     copy_config_snapshot,
     paper_run_paths,

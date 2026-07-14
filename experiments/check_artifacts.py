@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 
-from risk_preference_inference.run_management import check_artifacts, paper_run_paths
+from risk_shift_bench.run_management import check_artifacts, paper_run_paths
 
 
 def main() -> None:

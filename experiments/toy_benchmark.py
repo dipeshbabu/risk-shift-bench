@@ -5,8 +5,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from risk_preference_inference.reporting import write_json
-from risk_preference_inference.toy_envs import run_toy_benchmark, toy_results_as_dicts
+from risk_shift_bench.reporting import write_json
+from risk_shift_bench.toy_envs import run_toy_benchmark, toy_results_as_dicts
 
 
 def main() -> None:

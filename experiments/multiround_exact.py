@@ -5,11 +5,11 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from risk_preference_inference.envs import benchmark_tasks
-from risk_preference_inference.multiround_distributions import final_bankroll_distribution
-from risk_preference_inference.objectives import cvar_lower, mean, probability_at_or_above, probability_at_or_below
-from risk_preference_inference.policy_registry import core_policies
-from risk_preference_inference.reporting import write_json
+from risk_shift_bench.envs import benchmark_tasks
+from risk_shift_bench.multiround_distributions import final_bankroll_distribution
+from risk_shift_bench.objectives import cvar_lower, mean, probability_at_or_above, probability_at_or_below
+from risk_shift_bench.policy_registry import core_policies
+from risk_shift_bench.reporting import write_json
 
 
 def main() -> None:

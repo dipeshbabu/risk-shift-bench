@@ -8,9 +8,9 @@ import random
 from dataclasses import asdict
 from pathlib import Path
 
-from risk_preference_inference.fitting import fit_static_prospect
-from risk_preference_inference.risk_models import ProspectUtilityModel, RiskModel
-from risk_preference_inference.synthetic import generate_synthetic_records
+from risk_shift_bench.fitting import fit_static_prospect
+from risk_shift_bench.risk_models import ProspectUtilityModel, RiskModel
+from risk_shift_bench.synthetic import generate_synthetic_records
 
 
 def main() -> None:

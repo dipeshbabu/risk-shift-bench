@@ -5,10 +5,10 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from risk_preference_inference.diagnostics import action_map, adaptive_alpha_curve, rows_as_dicts
-from risk_preference_inference.envs import benchmark_tasks
-from risk_preference_inference.policy_registry import adaptive_cvar_policy, core_policies
-from risk_preference_inference.reporting import write_json
+from risk_shift_bench.diagnostics import action_map, adaptive_alpha_curve, rows_as_dicts
+from risk_shift_bench.envs import benchmark_tasks
+from risk_shift_bench.policy_registry import adaptive_cvar_policy, core_policies
+from risk_shift_bench.reporting import write_json
 
 
 def main() -> None:

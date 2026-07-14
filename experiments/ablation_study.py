@@ -7,10 +7,10 @@ import csv
 from dataclasses import asdict
 from pathlib import Path
 
-from risk_preference_inference.ablations import run_ablation_study
-from risk_preference_inference.config import load_benchmark_config
-from risk_preference_inference.envs import benchmark_suite_names, benchmark_tasks
-from risk_preference_inference.reporting import write_json, write_summary_csv
+from risk_shift_bench.ablations import run_ablation_study
+from risk_shift_bench.config import load_benchmark_config
+from risk_shift_bench.envs import benchmark_suite_names, benchmark_tasks
+from risk_shift_bench.reporting import write_json, write_summary_csv
 
 
 def write_csv(path: Path, rows: list[dict]) -> None:

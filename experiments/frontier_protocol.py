@@ -6,9 +6,9 @@ import argparse
 import csv
 from pathlib import Path
 
-from risk_preference_inference.envs import benchmark_tasks
-from risk_preference_inference.multiseed import run_multiseed_evaluation
-from risk_preference_inference.reporting import write_json
+from risk_shift_bench.envs import benchmark_tasks
+from risk_shift_bench.multiseed import run_multiseed_evaluation
+from risk_shift_bench.reporting import write_json
 
 
 def parse_seeds(value: str) -> list[int]:

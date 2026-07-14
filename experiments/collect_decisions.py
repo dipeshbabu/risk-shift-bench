@@ -5,8 +5,8 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 
-from risk_preference_inference.active_query import candidate_states
-from risk_preference_inference.dataset import DecisionRecord, save_jsonl
+from risk_shift_bench.active_query import candidate_states
+from risk_shift_bench.dataset import DecisionRecord, save_jsonl
 
 
 def parse_action(raw: str) -> str:

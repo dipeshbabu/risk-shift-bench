@@ -7,8 +7,8 @@ import csv
 import json
 from pathlib import Path
 
-from risk_preference_inference.tables import best_policy_by_task, normalized_policy_ranks
-from risk_preference_inference.tables import to_latex_table
+from risk_shift_bench.tables import best_policy_by_task, normalized_policy_ranks
+from risk_shift_bench.tables import to_latex_table
 
 
 def write_csv(path: Path, rows: list[dict]) -> None:

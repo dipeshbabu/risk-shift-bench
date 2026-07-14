@@ -5,11 +5,11 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from risk_preference_inference.blackjack import DecisionState
-from risk_preference_inference.envs import benchmark_tasks
-from risk_preference_inference.policy_registry import core_policies
-from risk_preference_inference.reporting import write_json
-from risk_preference_inference.theory import horizon_action_table, horizon_reversals, rows_as_dicts
+from risk_shift_bench.blackjack import DecisionState
+from risk_shift_bench.envs import benchmark_tasks
+from risk_shift_bench.policy_registry import core_policies
+from risk_shift_bench.reporting import write_json
+from risk_shift_bench.theory import horizon_action_table, horizon_reversals, rows_as_dicts
 
 
 def diagnostic_states(task_name: str) -> list[DecisionState]:

@@ -6,8 +6,8 @@ import argparse
 import csv
 from pathlib import Path
 
-from risk_preference_inference.reporting import write_json
-from risk_preference_inference.statistics import paired_score_report
+from risk_shift_bench.reporting import write_json
+from risk_shift_bench.statistics import paired_score_report
 
 
 def load_csv(path: Path) -> list[dict]:

@@ -6,17 +6,17 @@ import argparse
 from dataclasses import asdict
 from pathlib import Path
 
-from risk_preference_inference.adaptive_search import (
+from risk_shift_bench.adaptive_search import (
     evaluate_strong_baselines,
     policy_score_report,
     search_adaptive_policy,
     search_adaptive_utility_policy,
     search_learned_mixture_policy,
 )
-from risk_preference_inference.config import load_adaptive_search_config
-from risk_preference_inference.envs import available_benchmark_tasks
-from risk_preference_inference.learned_adaptive_search import search_learned_adaptive_policy
-from risk_preference_inference.reporting import write_json
+from risk_shift_bench.config import load_adaptive_search_config
+from risk_shift_bench.envs import available_benchmark_tasks
+from risk_shift_bench.learned_adaptive_search import search_learned_adaptive_policy
+from risk_shift_bench.reporting import write_json
 
 
 def select_tasks(names: tuple[str, ...]) -> list:

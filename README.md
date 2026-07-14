@@ -1,9 +1,10 @@
-# Risk Preference Inference
+# RiskShiftBench
 
-Utilities for adaptive risk-sensitive planning under bankroll constraints. This
-repository contains a compact Blackjack benchmark, distributional objectives,
-state-adaptive risk policies, simulation tooling, and the earlier
-decision-inference utilities used for synthetic and human hit/stand data.
+RiskShiftBench provides locked stress tests and robust fallback-selection tools
+for risk-sensitive planning under bankroll constraints. This repository contains
+a compact Blackjack benchmark, distributional objectives, state-adaptive risk
+policies, simulation tooling, and the earlier decision-inference utilities used
+for synthetic and human hit/stand data.
 
 The central research question is whether risk sensitivity should be static or
 state-adaptive in sequential decision problems with ruin, target, drawdown, and
@@ -12,33 +13,33 @@ protocol are in [`docs/reproduction.md`](docs/reproduction.md).
 
 ## Repository Contents
 
-- `risk_preference_inference.envs`: benchmark task suites, including standard mean-return, ruin-constrained, target-reaching, drawdown, shifted-deck, hidden-regime, and tail-risk regimes.
-- `risk_preference_inference.objectives`: mean, CVaR, entropic risk, OCE, ruin-constrained, and target-seeking distributional objectives.
-- `risk_preference_inference.adaptive_risk`: state-adaptive CVaR schedules, adaptive utility objectives, learned objective mixtures, and constraint-aware risk gates.
-- `risk_preference_inference.policies`: benchmark policies, including objective policies and a regime-adaptive ensemble.
-- `risk_preference_inference.return_distributions`: exact hand-level payoff and bankroll distributions under an infinite-deck model.
-- `risk_preference_inference.benchmark`: policy x task simulation and aggregate risk metrics.
-- `risk_preference_inference.reporting`: JSONL, JSON, and CSV benchmark writers.
-- `risk_preference_inference.blackjack`: core Blackjack state utilities.
-- `risk_preference_inference.risk_models`: choice-model baselines for human/synthetic hit-stand prediction.
-- `risk_preference_inference.dataset`: decision records and JSONL IO.
-- `risk_preference_inference.fitting`: likelihood-based fitting for prospect-style choice models.
-- `risk_preference_inference.evaluation`: action-prediction metrics.
-- `risk_preference_inference.active_query`: disagreement-based state selection for data collection.
-- `risk_preference_inference.synthetic`: synthetic decision data generation.
-- `risk_preference_inference.statistics`: bootstrap confidence intervals and paired policy comparisons.
-- `risk_preference_inference.multiseed`: seed-level policy comparisons for higher-confidence evaluations.
-- `risk_preference_inference.robust_gate_search`: development-only search for signed-regime gate variants.
-- `risk_preference_inference.portfolio_selector`: task-feature policy portfolio selection across frontier tasks.
-- `risk_preference_inference.state_action_blend_search`: validation-selected per-decision blend-weight search.
-- `risk_preference_inference.incumbent_switch`: validation-selected task-regime switching between strong incumbents.
-- `risk_preference_inference.meta_selector`: learned task-feature KNN policy selection.
-- `risk_preference_inference.family_selector`: conservative family-level delegate promotion.
-- `risk_preference_inference.lcb_selector`: uncertainty-penalized lower-confidence delegate selection.
-- `risk_preference_inference.portfolio_envs`: portfolio allocation task suites with hidden market regimes, drawdown, ruin, and target constraints.
-- `risk_preference_inference.portfolio_benchmark`: portfolio simulator, policy grid, and benchmark summaries.
-- `risk_preference_inference.portfolio_lcb_selector`: lower-confidence delegate selection for the portfolio domain.
-- `risk_preference_inference.toy_envs`: non-Blackjack toy risk tasks.
+- `risk_shift_bench.envs`: benchmark task suites, including standard mean-return, ruin-constrained, target-reaching, drawdown, shifted-deck, hidden-regime, and tail-risk regimes.
+- `risk_shift_bench.objectives`: mean, CVaR, entropic risk, OCE, ruin-constrained, and target-seeking distributional objectives.
+- `risk_shift_bench.adaptive_risk`: state-adaptive CVaR schedules, adaptive utility objectives, learned objective mixtures, and constraint-aware risk gates.
+- `risk_shift_bench.policies`: benchmark policies, including objective policies and a regime-adaptive ensemble.
+- `risk_shift_bench.return_distributions`: exact hand-level payoff and bankroll distributions under an infinite-deck model.
+- `risk_shift_bench.benchmark`: policy x task simulation and aggregate risk metrics.
+- `risk_shift_bench.reporting`: JSONL, JSON, and CSV benchmark writers.
+- `risk_shift_bench.blackjack`: core Blackjack state utilities.
+- `risk_shift_bench.risk_models`: choice-model baselines for human/synthetic hit-stand prediction.
+- `risk_shift_bench.dataset`: decision records and JSONL IO.
+- `risk_shift_bench.fitting`: likelihood-based fitting for prospect-style choice models.
+- `risk_shift_bench.evaluation`: action-prediction metrics.
+- `risk_shift_bench.active_query`: disagreement-based state selection for data collection.
+- `risk_shift_bench.synthetic`: synthetic decision data generation.
+- `risk_shift_bench.statistics`: bootstrap confidence intervals and paired policy comparisons.
+- `risk_shift_bench.multiseed`: seed-level policy comparisons for higher-confidence evaluations.
+- `risk_shift_bench.robust_gate_search`: development-only search for signed-regime gate variants.
+- `risk_shift_bench.portfolio_selector`: task-feature policy portfolio selection across frontier tasks.
+- `risk_shift_bench.state_action_blend_search`: validation-selected per-decision blend-weight search.
+- `risk_shift_bench.incumbent_switch`: validation-selected task-regime switching between strong incumbents.
+- `risk_shift_bench.meta_selector`: learned task-feature KNN policy selection.
+- `risk_shift_bench.family_selector`: conservative family-level delegate promotion.
+- `risk_shift_bench.lcb_selector`: uncertainty-penalized lower-confidence delegate selection.
+- `risk_shift_bench.portfolio_envs`: portfolio allocation task suites with hidden market regimes, drawdown, ruin, and target constraints.
+- `risk_shift_bench.portfolio_benchmark`: portfolio simulator, policy grid, and benchmark summaries.
+- `risk_shift_bench.portfolio_lcb_selector`: lower-confidence delegate selection for the portfolio domain.
+- `risk_shift_bench.toy_envs`: non-Blackjack toy risk tasks.
 
 ## Basic Usage
 
