@@ -11,15 +11,6 @@ state-adaptive in sequential decision problems with ruin, target, drawdown, and
 distribution-shift constraints. Reproduction commands for the locked benchmark
 protocol are in [`docs/reproduction.md`](docs/reproduction.md).
 
-The locked zero-shot selector does not improve its searched-mixture fallback on
-a 40-task Blackjack suite (mean paired difference -0.20; task-bootstrap 95% CI
-[-2.98, 1.88]). The final method therefore verifies proposed overrides with
-independent paired pilots. On three new factorial suites totaling 104 tasks, the
-pilot-verified router improves the equal-domain relative score by 1.24% (95% CI
-[0.70%, 1.88%], sign-flip p<1e-5). It accepts 21 of 59 proposals, with no
-negative final effect among those 21 fixed-suite promotions. This is a
-three-simulator result, not a universal safety guarantee.
-
 ## Repository Contents
 
 - `risk_shift_bench.envs`: benchmark task suites, including standard mean-return, ruin-constrained, target-reaching, drawdown, shifted-deck, hidden-regime, and tail-risk regimes.
