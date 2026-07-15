@@ -11,6 +11,7 @@ from risk_shift_bench.envs import (
     frontier_audit_tasks,
     frontier_confirmation_audit_tasks,
     frontier_confirmation_audit_v2_tasks,
+    frontier_confirmation_audit_v3_tasks,
     frontier_benchmark_tasks,
     frontier_development_tasks,
     frontier_final_audit_tasks,
@@ -104,6 +105,7 @@ from risk_shift_bench.state_action_blend_search import (
 )
 from risk_shift_bench.splits import make_split
 from risk_shift_bench.synthetic import generate_synthetic_records
+from risk_shift_bench.statistics import paired_score_deltas, paired_score_report
 from risk_shift_bench.target_search import (
     evaluate_promotion_gate,
     PromotionGateResult,
@@ -111,9 +113,97 @@ from risk_shift_bench.target_search import (
     target_branch_candidate_policy,
     target_candidate_params,
 )
+from experiments.conformal_router import (
+    ConformalAdvantageRouter,
+    RouterParams,
+    RoutingProfile,
+    finite_sample_upper_quantile,
+)
+from experiments.frontier_v4_tasks import (
+    blackjack_confirmation_v4_tasks,
+    portfolio_confirmation_v2_tasks,
+)
+from experiments.inventory_domain import (
+    InventoryTask,
+    inventory_calibration_tasks,
+    inventory_confirmation_tasks,
+    inventory_development_tasks,
+    inventory_policy_grid,
+    inventory_task_features,
+    run_inventory_benchmark,
+)
+from experiments.pilot_verifier import PilotGateParams, one_sided_sign_test_p, verify_promotion
 
 
 class SmokeTests(unittest.TestCase):
+    def test_frontier_extension_factorial_suites_are_complete(self):
+        blackjack = blackjack_confirmation_v4_tasks()
+        portfolio = portfolio_confirmation_v2_tasks()
+        inventory = inventory_confirmation_tasks()
+        self.assertEqual(len(blackjack), 40)
+        self.assertEqual(len(portfolio), 32)
+        self.assertEqual(len(inventory), 32)
+        self.assertEqual(len({task.name for task in blackjack}), len(blackjack))
+        self.assertEqual(len({task.name for task in portfolio}), len(portfolio))
+        self.assertEqual(len({task.name for task in inventory}), len(inventory))
+
+    def test_inventory_splits_are_disjoint_and_benchmark_runs(self):
+        development = {task.name for task in inventory_development_tasks()}
+        calibration = {task.name for task in inventory_calibration_tasks()}
+        confirmation = {task.name for task in inventory_confirmation_tasks()}
+        self.assertFalse(development & calibration)
+        self.assertFalse(development & confirmation)
+        self.assertFalse(calibration & confirmation)
+        task = InventoryTask(name="inventory-smoke", periods=3)
+        episodes, summaries = run_inventory_benchmark(
+            [task],
+            policies=inventory_policy_grid()[:2],
+            episodes=2,
+            seed=3,
+        )
+        self.assertEqual(len(episodes), 4)
+        self.assertEqual(len(summaries), 2)
+        self.assertEqual(len(inventory_task_features(task)), 13)
+
+    def test_conformal_router_screens_on_fit_and_calibrates_disjoint_tasks(self):
+        fit_profiles = [
+            RoutingProfile("fit-a", (0.0,), {"base": 0.0, "good": 3.0, "bad": -2.0}),
+            RoutingProfile("fit-b", (1.0,), {"base": 0.0, "good": 2.0, "bad": -1.0}),
+        ]
+        calibration_profiles = [
+            RoutingProfile("cal-a", (0.2,), {"base": 0.0, "good": 2.5, "bad": -1.5}),
+            RoutingProfile("cal-b", (0.8,), {"base": 0.0, "good": 1.5, "bad": -0.5}),
+        ]
+        router = ConformalAdvantageRouter(
+            fit_profiles=fit_profiles,
+            calibration_profiles=calibration_profiles,
+            candidate_policies=("good", "bad"),
+            params=RouterParams(
+                k=1,
+                min_fit_evidence=1,
+                min_calibration_tasks=2,
+                fallback_policy="base",
+            ),
+            feature_fn=lambda task: task["features"],
+        )
+        self.assertEqual(router.candidate_policies, ("good",))
+        self.assertEqual(router.proposal({"features": (0.1,)}).selected_policy, "good")
+        self.assertGreaterEqual(router.calibration.conformal_correction, 0.0)
+        self.assertEqual(finite_sample_upper_quantile([1.0, 2.0, 3.0], 0.1), 3.0)
+
+    def test_pilot_gate_uses_exact_one_sided_sign_test(self):
+        self.assertLess(one_sided_sign_test_p(7, 0), 0.01)
+        accepted = verify_promotion(
+            [1.0] * 7,
+            PilotGateParams(alpha=0.01, min_nonzero_batches=7),
+        )
+        rejected = verify_promotion(
+            [1.0] * 6 + [-1.0],
+            PilotGateParams(alpha=0.01, min_nonzero_batches=7),
+        )
+        self.assertTrue(accepted.accepted)
+        self.assertFalse(rejected.accepted)
+
     def test_action_probabilities_are_valid(self):
         state = DecisionState(player_cards=(10, 6), dealer_card=10)
         probs = action_probabilities(state, ExpectedValueModel())
@@ -241,6 +331,7 @@ class SmokeTests(unittest.TestCase):
         blind_audit_names = {task.name for task in frontier_blind_audit_tasks()}
         confirmation_audit_names = {task.name for task in frontier_confirmation_audit_tasks()}
         confirmation_audit_v2_names = {task.name for task in frontier_confirmation_audit_v2_tasks()}
+        confirmation_audit_v3_names = {task.name for task in frontier_confirmation_audit_v3_tasks()}
         full_names = {task.name for task in benchmark_tasks("frontier")}
         self.assertTrue(dev_names)
         self.assertTrue(holdout_names)
@@ -249,27 +340,35 @@ class SmokeTests(unittest.TestCase):
         self.assertTrue(blind_audit_names)
         self.assertTrue(confirmation_audit_names)
         self.assertTrue(confirmation_audit_v2_names)
+        self.assertEqual(len(confirmation_audit_v3_names), 40)
         self.assertFalse(dev_names & holdout_names)
         self.assertFalse(dev_names & audit_names)
         self.assertFalse(dev_names & final_audit_names)
         self.assertFalse(dev_names & blind_audit_names)
         self.assertFalse(dev_names & confirmation_audit_names)
         self.assertFalse(dev_names & confirmation_audit_v2_names)
+        self.assertFalse(dev_names & confirmation_audit_v3_names)
         self.assertFalse(holdout_names & audit_names)
         self.assertFalse(holdout_names & final_audit_names)
         self.assertFalse(holdout_names & blind_audit_names)
         self.assertFalse(holdout_names & confirmation_audit_names)
         self.assertFalse(holdout_names & confirmation_audit_v2_names)
+        self.assertFalse(holdout_names & confirmation_audit_v3_names)
         self.assertFalse(audit_names & final_audit_names)
         self.assertFalse(audit_names & blind_audit_names)
         self.assertFalse(audit_names & confirmation_audit_names)
         self.assertFalse(audit_names & confirmation_audit_v2_names)
+        self.assertFalse(audit_names & confirmation_audit_v3_names)
         self.assertFalse(final_audit_names & blind_audit_names)
         self.assertFalse(final_audit_names & confirmation_audit_names)
         self.assertFalse(final_audit_names & confirmation_audit_v2_names)
+        self.assertFalse(final_audit_names & confirmation_audit_v3_names)
         self.assertFalse(blind_audit_names & confirmation_audit_names)
         self.assertFalse(blind_audit_names & confirmation_audit_v2_names)
+        self.assertFalse(blind_audit_names & confirmation_audit_v3_names)
         self.assertFalse(confirmation_audit_names & confirmation_audit_v2_names)
+        self.assertFalse(confirmation_audit_names & confirmation_audit_v3_names)
+        self.assertFalse(confirmation_audit_v2_names & confirmation_audit_v3_names)
         self.assertEqual(
             full_names,
             dev_names
@@ -278,7 +377,8 @@ class SmokeTests(unittest.TestCase):
             | final_audit_names
             | blind_audit_names
             | confirmation_audit_names
-            | confirmation_audit_v2_names,
+            | confirmation_audit_v2_names
+            | confirmation_audit_v3_names,
         )
         self.assertTrue(all("Holdout" in name for name in holdout_names))
         self.assertTrue(all("Audit" in name for name in audit_names))
@@ -286,6 +386,7 @@ class SmokeTests(unittest.TestCase):
         self.assertTrue(all("BlindAudit" in name for name in blind_audit_names))
         self.assertTrue(all("Confirm" in name for name in confirmation_audit_names))
         self.assertTrue(all("ConfirmV2" in name for name in confirmation_audit_v2_names))
+        self.assertTrue(all("ConfirmV3" in name for name in confirmation_audit_v3_names))
         self.assertEqual({task.name for task in benchmark_tasks("frontier_final_audit")}, final_audit_names)
         self.assertEqual({task.name for task in benchmark_tasks("frontier_blind_audit")}, blind_audit_names)
         self.assertEqual(
@@ -295,6 +396,10 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(
             {task.name for task in benchmark_tasks("frontier_confirmation_audit_v2")},
             confirmation_audit_v2_names,
+        )
+        self.assertEqual(
+            {task.name for task in benchmark_tasks("frontier_confirmation_audit_v3")},
+            confirmation_audit_v3_names,
         )
 
     def test_hidden_regime_task_runs(self):
@@ -822,6 +927,30 @@ class SmokeTests(unittest.TestCase):
         deltas = paired_policy_deltas(rows, reference_policy="ref")
         self.assertEqual(deltas[0]["n_pairs"], 2)
         self.assertEqual(deltas[0]["mean_delta"], 0.0)
+
+    def test_task_level_paired_score_report_averages_seeds_before_inference(self):
+        rows = [
+            {"task": "a", "seed": 0, "policy": "ref", "score": 4.0},
+            {"task": "a", "seed": 0, "policy": "base", "score": 1.0},
+            {"task": "a", "seed": 1, "policy": "ref", "score": 2.0},
+            {"task": "a", "seed": 1, "policy": "base", "score": 1.0},
+            {"task": "b", "seed": 0, "policy": "ref", "score": 0.0},
+            {"task": "b", "seed": 0, "policy": "base", "score": 2.0},
+            {"task": "b", "seed": 1, "policy": "ref", "score": 3.0},
+            {"task": "b", "seed": 1, "policy": "base", "score": 1.0},
+        ]
+        self.assertEqual(paired_score_deltas(rows, "ref", "base", unit="task"), [2.0, 0.0])
+        report = paired_score_report(
+            rows,
+            "ref",
+            "base",
+            unit="task",
+            bootstrap_samples=100,
+            randomization_samples=100,
+        )
+        self.assertEqual(report["unit"], "task")
+        self.assertEqual(report["n_units"], 2)
+        self.assertEqual(report["mean_delta"], 1.0)
 
     def test_regime_adaptive_policy_scores(self):
         task = RiskTask(name="regime-test", rounds=2, initial_bankroll=120, target_bankroll=150)

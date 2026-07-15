@@ -9,6 +9,77 @@ All commands assume dependencies were installed with:
 uv sync
 ```
 
+## Pilot-verified three-domain study
+
+The canonical final protocol is
+`configs/frontier_pilot_verified_protocol.json`. It assumes a clean output path;
+the runner refuses to overwrite checkpoints. First validate the task, cache,
+proposal, source, and protocol hashes:
+
+```bash
+uv run python -m experiments.pilot_verified_evaluation --dry-run
+```
+
+Run seven pilot checkpoints per domain, then freeze each domain's gate file:
+
+```bash
+for domain in blackjack_v4 portfolio_v2 inventory_v1; do
+  for batch in 0 1 2 3 4 5 6; do
+    uv run python -m experiments.pilot_verified_evaluation --pilot "$domain" --pilot-batch "$batch"
+  done
+  uv run python -m experiments.pilot_verified_evaluation --lock-gates "$domain"
+done
+```
+
+Run the disjoint final seeds and combine each domain:
+
+```bash
+for domain in blackjack_v4 portfolio_v2 inventory_v1; do
+  for seed in 0 1 2 3 4; do
+    uv run python -m experiments.pilot_verified_evaluation --eval "$domain" --eval-seed "$seed"
+  done
+  uv run python -m experiments.pilot_verified_evaluation --combine-domain "$domain"
+done
+uv run python -m experiments.pilot_verified_evaluation --combine-all
+```
+
+The canonical artifact is
+`artifacts/frontier_pilot_verified_3domain_v1`. Its confirmatory result is
++1.2403% equal-domain relative improvement, with within-domain task-bootstrap 95% CI
+[0.7004%, 1.8780%] and sign-flip p<1e-5. The domain raw-score effects are 0.00,
++3.65, and +70.70 for Blackjack, RiskPortfolio, and RiskInventory. These
+commands reproduce the local lock; it was not externally preregistered.
+
+## Post-confirmation robustness checks
+
+After the canonical artifact exists, recompute the descriptive checks with:
+
+```bash
+uv run python -m experiments.pilot_verified_robustness
+```
+
+The command writes `artifacts/frontier_pilot_verified_robustness_v1`. It does
+not simulate new outcomes. The main outputs are `strategy_comparison.csv`,
+`random_matched_summary.json`, `pilot_budget_curve.csv`,
+`score_weight_sensitivity.csv`, and `summary.json`. Expected headline values
+are -1.87% for candidate everywhere, +0.53% for all fit-only proposals, and
++1.24% for pilot verification. The 81 fixed-route score variants range from
++0.96% to +1.56%, all with zero harmful accepted routes.
+
+These values are post-confirmation because they use the opened final task
+effects. The count-matched random percentile is not a primary p-value, and the
+score grid was not part of the local confirmation lock.
+
+## Draft external extension
+
+[`preregistration_external_domains_v1.md`](preregistration_external_domains_v1.md)
+and
+[`../configs/external_domain_extension_preregistration_draft_v1.json`](../configs/external_domain_extension_preregistration_draft_v1.json)
+define the next study as a draft. They are not an external registration. Do
+not run an external confirmation episode until the final protocol contains an
+immutable registration URL, timestamp, environment commits, checkpoint hashes,
+and frozen analysis rules.
+
 ## Pre-confirmation Blackjack score caches
 
 The robust Blackjack selectors consume cached scores from development, holdout,
@@ -122,6 +193,39 @@ uv run python -m experiments.cached_lcb_selector \
   --worst-loss-weight 2.0 \
   --out-dir artifacts/robust_searched_fallback_lcb_fresh_confirmation_v2_5seed_100ep_v1
 ```
+
+## Locked factorial Blackjack confirmation
+
+The third confirmation suite is evaluated from the local pre-outcome protocol,
+which verifies the task, source, frozen-selector, and score-cache hashes before
+running. Validate the lock first:
+
+```bash
+uv run python -m experiments.frozen_confirmation_v3 --dry-run
+```
+
+Run each locked seed into its own checkpoint. The seeds may be launched in
+parallel because their output paths are disjoint:
+
+```bash
+uv run python -m experiments.frozen_confirmation_v3 --seed 0
+uv run python -m experiments.frozen_confirmation_v3 --seed 1
+uv run python -m experiments.frozen_confirmation_v3 --seed 2
+uv run python -m experiments.frozen_confirmation_v3 --seed 3
+uv run python -m experiments.frozen_confirmation_v3 --seed 4
+```
+
+After all five checkpoints exist, validate their task, policy, and seed
+coverage and compute the locked task-level analysis:
+
+```bash
+uv run python -m experiments.frozen_confirmation_v3 --combine
+```
+
+The result directory is
+`artifacts/frontier_confirmation_v3_frozen_5seed_100ep_v1`. The primary
+selector-minus-searched-mixture result is -0.20 with task-bootstrap 95% CI
+[-2.98, 1.88] and task-level sign-flip p=0.936.
 
 ## Portfolio benchmark caches
 

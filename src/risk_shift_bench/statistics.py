@@ -106,15 +106,28 @@ def paired_policy_differences(
     return output
 
 
-def paired_score_deltas(rows: list[dict], reference_policy: str, baseline_policy: str, score_field: str = "score") -> list[float]:
+def paired_score_deltas(
+    rows: list[dict],
+    reference_policy: str,
+    baseline_policy: str,
+    score_field: str = "score",
+    unit: str = "task_seed",
+) -> list[float]:
+    if unit not in {"task_seed", "task"}:
+        raise ValueError("unit must be 'task_seed' or 'task'")
     by_pair: dict[tuple[str, int], dict[str, float]] = defaultdict(dict)
     for row in rows:
         by_pair[(row["task"], int(row["seed"]))][row["policy"]] = float(row[score_field])
-    deltas = []
-    for values in by_pair.values():
+    paired = []
+    for (task, _seed), values in by_pair.items():
         if reference_policy in values and baseline_policy in values:
-            deltas.append(values[reference_policy] - values[baseline_policy])
-    return deltas
+            paired.append((task, values[reference_policy] - values[baseline_policy]))
+    if unit == "task_seed":
+        return [delta for _task, delta in paired]
+    by_task: dict[str, list[float]] = defaultdict(list)
+    for task, delta in paired:
+        by_task[task].append(delta)
+    return [mean(by_task[task]) for task in sorted(by_task)]
 
 
 def sign_flip_p_value(
@@ -144,14 +157,23 @@ def paired_score_report(
     bootstrap_samples: int = 10_000,
     randomization_samples: int = 100_000,
     seed: int = 0,
+    unit: str = "task_seed",
 ) -> dict:
-    deltas = paired_score_deltas(rows, reference_policy, baseline_policy, score_field=score_field)
+    deltas = paired_score_deltas(
+        rows,
+        reference_policy,
+        baseline_policy,
+        score_field=score_field,
+        unit=unit,
+    )
     ci = bootstrap_ci(deltas, samples=bootstrap_samples, seed=seed)
     return {
         "reference_policy": reference_policy,
         "baseline_policy": baseline_policy,
         "score_field": score_field,
+        "unit": unit,
         "n_pairs": len(deltas),
+        "n_units": len(deltas),
         "mean_delta": ci.estimate,
         "bootstrap_ci_low": ci.low,
         "bootstrap_ci_high": ci.high,

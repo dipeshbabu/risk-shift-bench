@@ -4,6 +4,35 @@ For the exact commands used by the locked benchmark runs, see
 [`reproduction.md`](reproduction.md). This page keeps the broader experiment
 command reference.
 
+## Pilot-verified three-domain study
+
+The final paper method uses a development-only support-aware proposal followed
+by seven independent paired pilot batches. Its local protocol fixes 104 tasks,
+59 proposals, the pilot gate, final seeds, source manifest, and cross-domain
+estimand. Validate all hashes without simulating an outcome:
+
+```bash
+uv run python -m experiments.pilot_verified_evaluation --dry-run
+```
+
+See [`reproduction.md`](reproduction.md#pilot-verified-three-domain-study) for
+the checkpoint sequence. The canonical summary reports +1.24% equal-domain
+relative improvement (95% CI [0.70%, 1.88%], sign-flip p<1e-5), with 21 of 59
+proposals accepted and zero negative final effects among accepted routes.
+
+The following command reads the completed artifact and writes descriptive
+deployment-rule comparisons, a pilot-budget curve, count-matched random
+promotions, and score-weight sensitivity results:
+
+```bash
+uv run python -m experiments.pilot_verified_robustness
+```
+
+All outputs under `artifacts/frontier_pilot_verified_robustness_v1` are
+post-confirmation. For the next independent study, use the unregistered draft
+in [`preregistration_external_domains_v1.md`](preregistration_external_domains_v1.md)
+and register its final hashes before running any external confirmation task.
+
 Smoke benchmark:
 
 ```bash
@@ -85,6 +114,19 @@ uv run python -m experiments.multiseed_evaluation \
   --seeds 0,1,2 \
   --episodes 100
 ```
+
+Third confirmation task grid:
+
+```bash
+uv run python -m experiments.multiseed_evaluation \
+  --config configs/benchmark_frontier_confirmation_audit_v3.json \
+  --seeds 0,1,2 \
+  --episodes 100
+```
+
+For the paper's hash-locked five-seed selector evaluation and task-level
+inference, use `experiments.frozen_confirmation_v3` as documented in
+[`reproduction.md`](reproduction.md), rather than re-running selector search.
 
 Dev-only robust gate search:
 

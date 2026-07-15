@@ -630,6 +630,98 @@ def frontier_confirmation_audit_v2_tasks() -> list[RiskTask]:
     ]
 
 
+def frontier_confirmation_audit_v3_tasks() -> list[RiskTask]:
+    """Return the locked Cartesian confirmation grid used for the final test.
+
+    The suite crosses ten pre-specified deck regimes with four risk profiles.
+    Keeping the construction factorial makes every cell auditable and prevents
+    outcome-dependent task selection.
+    """
+    balanced_hidden: CardRegimeDistribution = (
+        (LOW_CARD_SHIFT, 0.20),
+        (STANDARD_DECK, 0.20),
+        (HIGH_CARD_SHIFT, 0.20),
+        (TEN_DEPLETED_SHIFT, 0.20),
+        (ACE_RICH_SHIFT, 0.20),
+    )
+    adverse_tail_hidden: CardRegimeDistribution = (
+        (EXTREME_LOW_CARD_SHIFT, 0.35),
+        (TEN_DEPLETED_SHIFT, 0.25),
+        (STANDARD_DECK, 0.20),
+        (EXTREME_HIGH_CARD_SHIFT, 0.10),
+        (ACE_RICH_SHIFT, 0.10),
+    )
+    bimodal_hidden: CardRegimeDistribution = (
+        (EXTREME_LOW_CARD_SHIFT, 0.50),
+        (EXTREME_HIGH_CARD_SHIFT, 0.50),
+    )
+    regimes: tuple[tuple[str, CardDistribution, CardRegimeDistribution | None], ...] = (
+        ("Standard", STANDARD_DECK, None),
+        ("Low", LOW_CARD_SHIFT, None),
+        ("High", HIGH_CARD_SHIFT, None),
+        ("ExtremeLow", EXTREME_LOW_CARD_SHIFT, None),
+        ("ExtremeHigh", EXTREME_HIGH_CARD_SHIFT, None),
+        ("TenDepleted", TEN_DEPLETED_SHIFT, None),
+        ("AceRich", ACE_RICH_SHIFT, None),
+        ("HiddenBalanced", STANDARD_DECK, balanced_hidden),
+        ("HiddenAdverseTail", STANDARD_DECK, adverse_tail_hidden),
+        ("HiddenBimodal", STANDARD_DECK, bimodal_hidden),
+    )
+    profiles: tuple[tuple[str, dict[str, int | float]], ...] = (
+        (
+            "ShortTarget",
+            {
+                "rounds": 18,
+                "initial_bankroll": 500.0,
+                "bet": 30.0,
+                "target_bankroll": 690.0,
+                "drawdown_limit": 0.20,
+            },
+        ),
+        (
+            "LongTarget",
+            {
+                "rounds": 56,
+                "initial_bankroll": 540.0,
+                "bet": 25.0,
+                "target_bankroll": 820.0,
+                "drawdown_limit": 0.14,
+            },
+        ),
+        (
+            "TightDrawdown",
+            {
+                "rounds": 44,
+                "initial_bankroll": 520.0,
+                "bet": 25.0,
+                "target_bankroll": 760.0,
+                "drawdown_limit": 0.08,
+            },
+        ),
+        (
+            "NearRuin",
+            {
+                "rounds": 28,
+                "initial_bankroll": 300.0,
+                "bet": 45.0,
+                "ruin_bankroll": 45.0,
+                "target_bankroll": 620.0,
+                "drawdown_limit": 0.17,
+            },
+        ),
+    )
+    return [
+        RiskTask(
+            name=f"RiskBlackjack-ConfirmV3-{regime_name}-{profile_name}-v0",
+            card_probs=card_probs,
+            episode_card_regimes=episode_card_regimes,
+            **profile,
+        )
+        for regime_name, card_probs, episode_card_regimes in regimes
+        for profile_name, profile in profiles
+    ]
+
+
 def frontier_benchmark_tasks() -> list[RiskTask]:
     return [
         *frontier_development_tasks(),
@@ -639,6 +731,7 @@ def frontier_benchmark_tasks() -> list[RiskTask]:
         *frontier_blind_audit_tasks(),
         *frontier_confirmation_audit_tasks(),
         *frontier_confirmation_audit_v2_tasks(),
+        *frontier_confirmation_audit_v3_tasks(),
     ]
 
 
@@ -652,6 +745,7 @@ def benchmark_suite_names() -> tuple[str, ...]:
         "frontier_blind_audit",
         "frontier_confirmation_audit",
         "frontier_confirmation_audit_v2",
+        "frontier_confirmation_audit_v3",
         "frontier",
     )
 
@@ -673,6 +767,8 @@ def benchmark_tasks(suite: str = "standard") -> list[RiskTask]:
         return frontier_confirmation_audit_tasks()
     if suite == "frontier_confirmation_audit_v2":
         return frontier_confirmation_audit_v2_tasks()
+    if suite == "frontier_confirmation_audit_v3":
+        return frontier_confirmation_audit_v3_tasks()
     if suite == "frontier":
         return frontier_benchmark_tasks()
     raise ValueError(f"Unknown benchmark suite: {suite}")

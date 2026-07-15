@@ -31,6 +31,7 @@ def main() -> None:
     parser.add_argument("--reference-policy", required=True)
     parser.add_argument("--baseline-policy", required=True)
     parser.add_argument("--score-field", default="score")
+    parser.add_argument("--unit", choices=("task_seed", "task"), default="task_seed")
     parser.add_argument("--bootstrap-samples", type=int, default=10_000)
     parser.add_argument("--randomization-samples", type=int, default=100_000)
     parser.add_argument("--seed", type=int, default=0)
@@ -46,6 +47,7 @@ def main() -> None:
         bootstrap_samples=args.bootstrap_samples,
         randomization_samples=args.randomization_samples,
         seed=args.seed,
+        unit=args.unit,
     )
     out_dir = Path(args.out_dir)
     write_csv(out_dir / "paired_score_report.csv", [report])

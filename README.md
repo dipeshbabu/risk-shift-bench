@@ -1,15 +1,24 @@
 # RiskShiftBench
 
-RiskShiftBench provides locked stress tests and robust fallback-selection tools
-for risk-sensitive planning under bankroll constraints. This repository contains
-a compact Blackjack benchmark, distributional objectives, state-adaptive risk
-policies, simulation tooling, and the earlier decision-inference utilities used
-for synthetic and human hit/stand data.
+RiskShiftBench provides locked stress tests and policy-routing tools for
+risk-sensitive sequential decisions. The repository contains compact Blackjack,
+portfolio-allocation, and inventory-control simulators, together with
+distributional objectives, state-adaptive policies, paired pilot verification,
+and the earlier decision-inference utilities for hit/stand data.
 
 The central research question is whether risk sensitivity should be static or
 state-adaptive in sequential decision problems with ruin, target, drawdown, and
 distribution-shift constraints. Reproduction commands for the locked benchmark
 protocol are in [`docs/reproduction.md`](docs/reproduction.md).
+
+The locked zero-shot selector does not improve its searched-mixture fallback on
+a 40-task Blackjack suite (mean paired difference -0.20; task-bootstrap 95% CI
+[-2.98, 1.88]). The final method therefore verifies proposed overrides with
+independent paired pilots. On three new factorial suites totaling 104 tasks, the
+pilot-verified router improves the equal-domain relative score by 1.24% (95% CI
+[0.70%, 1.88%], sign-flip p<1e-5). It accepts 21 of 59 proposals, with no
+negative final effect among those 21 fixed-suite promotions. This is a
+three-simulator result, not a universal safety guarantee.
 
 ## Repository Contents
 
@@ -40,6 +49,11 @@ protocol are in [`docs/reproduction.md`](docs/reproduction.md).
 - `risk_shift_bench.portfolio_benchmark`: portfolio simulator, policy grid, and benchmark summaries.
 - `risk_shift_bench.portfolio_lcb_selector`: lower-confidence delegate selection for the portfolio domain.
 - `risk_shift_bench.toy_envs`: non-Blackjack toy risk tasks.
+- `experiments.inventory_domain`: inventory simulator, task suites, and policy library.
+- `experiments.conformal_router`: development-only candidate screening and support-aware proposals.
+- `experiments.pilot_verifier`: exact paired sign-test gate.
+- `experiments.pilot_verified_evaluation`: hash-locked pilot and final three-domain evaluation.
+- `experiments.pilot_verified_robustness`: post-confirmation deployment-rule, pilot-budget, and score-weight diagnostics.
 
 ## Basic Usage
 
@@ -168,6 +182,44 @@ uv run python -m experiments.cached_lcb_selector \
   --hand-depth 1 \
   --out-dir artifacts/lcb_selector_fresh_confirmation_v2
 ```
+
+Validate and run the locked factorial confirmation suite:
+
+```bash
+uv run python -m experiments.frozen_confirmation_v3 --dry-run
+uv run python -m experiments.frozen_confirmation_v3 --seed 0
+uv run python -m experiments.frozen_confirmation_v3 --seed 1
+uv run python -m experiments.frozen_confirmation_v3 --seed 2
+uv run python -m experiments.frozen_confirmation_v3 --seed 3
+uv run python -m experiments.frozen_confirmation_v3 --seed 4
+uv run python -m experiments.frozen_confirmation_v3 --combine
+```
+
+Validate the final three-domain protocol without running a simulation:
+
+```bash
+uv run python -m experiments.pilot_verified_evaluation --dry-run
+```
+
+The complete pilot, gate-locking, final-evaluation, and combine sequence is in
+[`docs/reproduction.md`](docs/reproduction.md#pilot-verified-three-domain-study).
+The canonical output is
+`artifacts/frontier_pilot_verified_3domain_v1/summary.json`.
+
+Recompute the explicitly post-confirmation robustness checks from that fixed
+artifact:
+
+```bash
+uv run python -m experiments.pilot_verified_robustness
+```
+
+The output is `artifacts/frontier_pilot_verified_robustness_v1`. It compares
+candidate-everywhere, fit-only, pilot-verified, and multiplicity-adjusted
+deployment rules; builds an all-subset pilot-budget curve; samples promotions
+matched to the accepted counts; and evaluates 81 score-weight combinations.
+These checks use opened final outcomes and are not additional confirmatory
+tests. The draft for a future externally registered extension is
+[`docs/preregistration_external_domains_v1.md`](docs/preregistration_external_domains_v1.md).
 
 Run the second environment family:
 
