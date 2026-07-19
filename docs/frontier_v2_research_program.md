@@ -179,25 +179,66 @@ racing rule, the Hoeffding-mixture router, and the betting-mixture router. The
 sign methods test an independent sign null rather than the conditional-mean
 null and are labeled separately; they are not interchangeable guarantees.
 
-## External benchmark target
+`experiments/robust_test_subset_baseline.py` implements a separate
+RPOSST-inspired comparison in the task-composition layer. It greedily selects a
+task subset and uses projected subgradient optimization to fit simplex weights
+that minimize the worst absolute full-test score error across tuning policies
+and frozen target task distributions. This is not the original k-of-N RPOSST
+algorithm and does not inherit its theorem. In an initial Taxi development
+matrix with four tasks, three policies, and 50 episodes per task-policy pair,
+the two-task subset reproduced the full equal-task policy scores with worst
+absolute error 0.00216. The test is useful enough to retain, but broader-domain
+calibration and comparisons with uniform and random subsets are still required.
 
-The final manifest should contain at least eight genuinely different domain
-families from at least four independently maintained codebases, with at least
-two domains using high-dimensional observations. Candidate pools under
-feasibility review include:
+## External benchmark implementation
 
-- Gymnasium: FrozenLake, CliffWalking, Taxi, and one classic-control domain;
-- OR-Gym: online knapsack, inventory management, vehicle routing, and bin
-  packing;
-- Safety-Gymnasium: PointGoal, PointButton, PointPush, and CarGoal; and
-- MiniGrid or an equivalent visual-control suite for high-dimensional transfer.
+The development manifest in `experiments/frontier_v2_external_design.py`
+contains nine genuinely different domain families from four independently
+maintained codebases:
 
-This is a feasibility pool, not a confirmation manifest. A domain enters the
-registered study only if its upstream commit, deterministic adapter contract,
-score bounds, candidate library, runtime, and task disjointness are validated
-before confirmation. The current machine has six CPU cores, 15.8 GB RAM, and a
-4 GB GTX 1650, so development can run locally but high-dimensional final
-evaluation may require a separately recorded compute environment.
+- Gymnasium 1.3.0: FrozenLake, CliffWalking, and Taxi;
+- OR-Gym 0.5.0: online knapsack and inventory management;
+- Safety-Gymnasium 1.2.0: PointGoal and PointButton; and
+- MiniGrid 3.1.0: DynamicObstacles and LavaCrossing.
+
+Each domain has four disjoint development, four calibration, and four declared
+confirmation tasks, giving 36 tasks per split. The current manifest hashes are
+`6de94c6456eccff522e9f9f359d589d10280f551a9616920f17746652a1c235e`
+for development,
+`da9faca59d0e1a59e8d98e03d99cdd86b698c5ac618b574492e110d71a2475c2`
+for calibration, and
+`6538bfd9910eae99be7e692e6d00ba67afbcb1dae68b1eb7ace146fc7aa885b2`
+for confirmation. These are development hashes and are not yet registration
+locks.
+
+The source audit verifies clean checkouts at Gymnasium commit
+`53bf3e9a884783eb72ad3fc8b15780914c97c3e1`, OR-Gym commit
+`0b18d16e569e2db70e83f09e867b53bdb4b87298`, Safety-Gymnasium commit
+`98231340a4c5b223c8d111fa9597d81836ce09b4`, and MiniGrid commit
+`90928729376741a41222a257911343b97103b548`. The complete import-time
+dependency stack is explicitly versioned, including dependencies that the
+upstream OR-Gym and Safety-Gymnasium packages import eagerly.
+
+Every episode is transformed by a frozen domain rule to a score in [0, 1], so
+the paired candidate-minus-fallback difference is always in [-1, 1]. The two
+MiniGrid suites operate on fully observable compact images, while both Safety
+suites use flattened lidar and proprioceptive observations; four domains
+therefore exceed the prespecified 32-coordinate high-dimensional threshold.
+
+A development-only end-to-end smoke run has completed for all nine domains.
+`experiments/frontier_v2_rehearsal_audit.py` verified complete policy libraries,
+common-random-number seed alignment, schema consistency, bounded scores, and
+the absence of confirmation tasks. This is adapter feasibility evidence, not a
+claim that the policy libraries are competitive or that every task is ready.
+Full development and calibration coverage, seed determinism reruns, score-bound
+stress tests, runtime accounting, and trained DQN/PPO/safe-RL references remain
+gates before registration. The execution adapter unconditionally refuses every
+confirmation task.
+
+The current machine has six CPU cores, 15.8 GB RAM, and a 4 GB GTX 1650, so
+scripted-policy development can run locally, but training or evaluating the
+high-dimensional reference policies may require a separately recorded compute
+environment.
 
 ## Empirical questions
 
