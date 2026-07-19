@@ -100,8 +100,17 @@ B_{i,n}(\lambda)=\prod_{t=1}^{n}
 The betting fractions are fixed before sampling, every factor is nonnegative,
 and the conditional expected factor is at most one under the null. Mixing the
 components therefore preserves anytime validity while adapting evidence growth
-to effect size. Before v2 is locked, this finite mixture should also be compared
-with tighter Bentkus and predictable plug-in betting constructions:
+to effect size.
+
+The implemented predictable plug-in comparison uses a frozen mixture of prior
+strengths. Before observation (t), each component forms a null-centered
+smoothed estimate from observations (1{:}t-1), uses the corresponding
+one-sided Kelly fraction, and clips it below one. The resulting stake is
+predictable and every multiplicative factor remains positive, so the same
+conditional supermartingale argument applies. It is compared under both
+uniform and adaptive resolution allocation. Before v2 is locked, the fixed and
+predictable mixtures should also be compared with a tighter Bentkus
+construction:
 
 - [Near-Optimal Confidence Sequences for Bounded Random Variables](https://proceedings.mlr.press/v139/kuchibhotla21a.html)
 - [Estimating Means of Bounded Random Variables by Betting](https://arxiv.org/abs/2010.09686)

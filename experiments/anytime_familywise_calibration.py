@@ -393,7 +393,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--effect-margin", type=float, default=0.0)
     parser.add_argument(
         "--e-process-method",
-        choices=("hoeffding_mixture", "betting_mixture", "both"),
+        choices=(
+            "hoeffding_mixture",
+            "betting_mixture",
+            "predictable_betting",
+            "both",
+            "all",
+        ),
         default="both",
     )
     parser.add_argument("--maximum-observations-per-task", type=int, default=100)
@@ -418,11 +424,16 @@ def main() -> None:
         strategies = ("uniform", "resolution", "certified")
     else:
         strategies = (args.strategy,)
-    methods = (
-        ("hoeffding_mixture", "betting_mixture")
-        if args.e_process_method == "both"
-        else (args.e_process_method,)
-    )
+    if args.e_process_method == "both":
+        methods = ("hoeffding_mixture", "betting_mixture")
+    elif args.e_process_method == "all":
+        methods = (
+            "hoeffding_mixture",
+            "betting_mixture",
+            "predictable_betting",
+        )
+    else:
+        methods = (args.e_process_method,)
     summaries = [
         summarize_trials(
             scenario,

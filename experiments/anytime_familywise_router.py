@@ -23,6 +23,7 @@ from math import ceil, exp, isfinite, log, log1p, sqrt
 
 DEFAULT_ETA_GRID = (0.125, 0.25, 0.5, 1.0, 2.0, 4.0)
 DEFAULT_BETTING_FRACTIONS = (0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 0.95)
+DEFAULT_PREDICTABLE_PRIOR_STRENGTHS = (0.5, 1.0, 2.0, 4.0, 8.0)
 
 
 class RouteDecision(str, Enum):
@@ -134,6 +135,10 @@ class AnytimeFamilywisePlan:
     e_process_method: str = "betting_mixture"
     eta_grid: tuple[float, ...] = DEFAULT_ETA_GRID
     betting_fraction_grid: tuple[float, ...] = DEFAULT_BETTING_FRACTIONS
+    predictable_prior_strengths: tuple[float, ...] = (
+        DEFAULT_PREDICTABLE_PRIOR_STRENGTHS
+    )
+    predictable_max_fraction: float = 0.95
     planning_effect_gaps: tuple[tuple[str, float], ...] = ()
     resolution_familywise_beta: float = 0.05
 
@@ -162,9 +167,14 @@ class AnytimeFamilywisePlan:
             raise ValueError("eta_grid entries must all be positive")
         if len(set(self.eta_grid)) != len(self.eta_grid):
             raise ValueError("eta_grid entries must be unique")
-        if self.e_process_method not in {"hoeffding_mixture", "betting_mixture"}:
+        if self.e_process_method not in {
+            "hoeffding_mixture",
+            "betting_mixture",
+            "predictable_betting",
+        }:
             raise ValueError(
-                "e_process_method must be 'hoeffding_mixture' or 'betting_mixture'"
+                "e_process_method must be 'hoeffding_mixture', "
+                "'betting_mixture', or 'predictable_betting'"
             )
         if not self.betting_fraction_grid or any(
             not 0.0 < fraction < 1.0 for fraction in self.betting_fraction_grid
@@ -172,6 +182,17 @@ class AnytimeFamilywisePlan:
             raise ValueError("betting fractions must lie strictly between zero and one")
         if len(set(self.betting_fraction_grid)) != len(self.betting_fraction_grid):
             raise ValueError("betting fraction entries must be unique")
+        if not self.predictable_prior_strengths or any(
+            not isfinite(strength) or strength <= 0.0
+            for strength in self.predictable_prior_strengths
+        ):
+            raise ValueError("predictable prior strengths must be finite and positive")
+        if len(set(self.predictable_prior_strengths)) != len(
+            self.predictable_prior_strengths
+        ):
+            raise ValueError("predictable prior strengths must be unique")
+        if not 0.0 < self.predictable_max_fraction < 1.0:
+            raise ValueError("predictable maximum fraction must lie in (0, 1)")
         if not 0.0 < self.resolution_familywise_beta < 1.0:
             raise ValueError(
                 "resolution_familywise_beta must lie strictly between zero and one"
@@ -276,11 +297,12 @@ class AnytimeFamilywiseRouter:
         self._decisions = {
             task: RouteDecision.UNDECIDED for task in plan.task_names
         }
-        component_count = (
-            len(plan.eta_grid)
-            if plan.e_process_method == "hoeffding_mixture"
-            else len(plan.betting_fraction_grid)
-        )
+        if plan.e_process_method == "hoeffding_mixture":
+            component_count = len(plan.eta_grid)
+        elif plan.e_process_method == "betting_mixture":
+            component_count = len(plan.betting_fraction_grid)
+        else:
+            component_count = len(plan.predictable_prior_strengths)
         self._log_weights = _mixture_log_weights(component_count)
         self._acceptance_component_logs = {
             task: list(self._log_weights) for task in plan.task_names
@@ -346,7 +368,7 @@ class AnytimeFamilywiseRouter:
             width = self.plan.observation_width
             for index, eta in enumerate(self.plan.eta_grid):
                 components[index] += eta * centered / width - eta * eta / 8.0
-        else:
+        elif self.plan.e_process_method == "betting_mixture":
             normalized = (
                 value - self.plan.observation_lower
             ) / self.plan.observation_width
@@ -360,6 +382,40 @@ class AnytimeFamilywiseRouter:
             for index, fraction in enumerate(self.plan.betting_fraction_grid):
                 betting_fraction = fraction / null_mean
                 components[index] += log1p(betting_fraction * centered)
+        else:
+            normalized = (
+                value - self.plan.observation_lower
+            ) / self.plan.observation_width
+            null_mean = (
+                self.plan.effect_margin - self.plan.observation_lower
+            ) / self.plan.observation_width
+            history_count = len(self._observations[task]) - 1
+            history_raw_sum = self._observation_sums[task] - value
+            history_normalized_sum = (
+                history_raw_sum
+                - history_count * self.plan.observation_lower
+            ) / self.plan.observation_width
+            if direction < 0.0:
+                normalized = 1.0 - normalized
+                null_mean = 1.0 - null_mean
+                history_normalized_sum = history_count - history_normalized_sum
+            centered = normalized - null_mean
+            for index, prior_strength in enumerate(
+                self.plan.predictable_prior_strengths
+            ):
+                predicted_mean = (
+                    prior_strength * null_mean + history_normalized_sum
+                ) / (prior_strength + history_count)
+                fraction = max(
+                    0.0,
+                    min(
+                        self.plan.predictable_max_fraction,
+                        (predicted_mean - null_mean) / (1.0 - null_mean),
+                    ),
+                )
+                components[index] += log1p(
+                    (fraction / null_mean) * centered
+                )
         return _logsumexp(components)
 
     def evidence(self, task: str) -> TaskEvidence:

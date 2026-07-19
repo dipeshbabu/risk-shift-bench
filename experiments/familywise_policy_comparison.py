@@ -43,6 +43,8 @@ DEFAULT_METHODS = (
     "betting_uniform",
     "betting_resolution",
     "betting_certified",
+    "predictable_uniform",
+    "predictable_resolution",
 )
 
 METHOD_ASSUMPTIONS = {
@@ -55,6 +57,8 @@ METHOD_ASSUMPTIONS = {
     "betting_uniform": "bounded anytime conditional-mean null",
     "betting_resolution": "bounded anytime conditional-mean null",
     "betting_certified": "bounded anytime conditional-mean null",
+    "predictable_uniform": "bounded anytime conditional-mean null",
+    "predictable_resolution": "bounded anytime conditional-mean null",
 }
 
 
@@ -271,13 +275,18 @@ def run_method_trial(
             global_observation_budget=global_observation_budget,
         )
     e_process_method, strategy = method.split("_")
+    router_method = (
+        "predictable_betting"
+        if e_process_method == "predictable"
+        else f"{e_process_method}_mixture"
+    )
     return run_synthetic_trial(
         scenario,
         strategy=strategy,
         seed=seed,
         familywise_alpha=familywise_alpha,
         effect_margin=effect_margin,
-        e_process_method=f"{e_process_method}_mixture",
+        e_process_method=router_method,
         maximum_observations_per_task=maximum_observations_per_task,
         global_observation_budget=global_observation_budget,
         forced_initial_observations=forced_initial_observations,

@@ -45,7 +45,10 @@ def test_positive_bounded_stream_crosses_acceptance_boundary() -> None:
     assert evidence.acceptance_log_e >= evidence.acceptance_log_threshold
 
 
-@pytest.mark.parametrize("method", ["hoeffding_mixture", "betting_mixture"])
+@pytest.mark.parametrize(
+    "method",
+    ["hoeffding_mixture", "betting_mixture", "predictable_betting"],
+)
 def test_each_e_process_method_accepts_clear_positive_stream(method: str) -> None:
     plan = AnytimeFamilywisePlan(
         task_names=("positive",),
@@ -56,6 +59,36 @@ def test_each_e_process_method_accepts_clear_positive_stream(method: str) -> Non
     while router.evidence("positive").decision is RouteDecision.UNDECIDED:
         router.update("positive", 1.0)
     assert router.evidence("positive").decision is RouteDecision.ACCEPT_CANDIDATE
+
+
+def test_predictable_betting_uses_no_current_outcome_in_its_stake() -> None:
+    plan = AnytimeFamilywisePlan(
+        task_names=("task",),
+        e_process_method="predictable_betting",
+        maximum_observations_per_task=200,
+    )
+    positive = AnytimeFamilywiseRouter(plan)
+    negative = AnytimeFamilywiseRouter(plan)
+    positive_first = positive.update("task", 1.0)
+    negative_first = negative.update("task", -1.0)
+    assert positive_first.acceptance_log_e == pytest.approx(0.0)
+    assert negative_first.acceptance_log_e == pytest.approx(0.0)
+    assert positive.update("task", 1.0).acceptance_log_e > 0.0
+
+
+def test_predictable_betting_configuration_is_validated() -> None:
+    with pytest.raises(ValueError, match="prior strengths"):
+        AnytimeFamilywisePlan(
+            task_names=("task",),
+            e_process_method="predictable_betting",
+            predictable_prior_strengths=(1.0, 1.0),
+        )
+    with pytest.raises(ValueError, match="maximum fraction"):
+        AnytimeFamilywisePlan(
+            task_names=("task",),
+            e_process_method="predictable_betting",
+            predictable_max_fraction=1.0,
+        )
 
 
 def test_negative_bounded_stream_crosses_futility_boundary() -> None:
