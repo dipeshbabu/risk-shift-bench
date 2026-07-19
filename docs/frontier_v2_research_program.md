@@ -425,6 +425,13 @@ contrasts can be analyzed as paired trial-level differences.
 These gates determine whether the design is mature enough to register. They do
 not determine whether final results are published.
 
+`experiments/frontier_v2_readiness.py` now enforces these execution gates in a
+single machine-readable audit. It verifies all seven clean source locks, both
+36-task portable rehearsals, all 12 learned baseline manifests and physical
+checkpoint schedules, calibration selection, and selected-checkpoint replay.
+It continues to state `confirmation_execution_authorized: false` even after
+all readiness checks pass; preregistration remains a separate required action.
+
 - A machine-checked proof appendix matches the implemented e-process formula.
 - Unit tests cover thresholds, bounds, alpha weights, terminal decisions, and
   allocation invariance.
