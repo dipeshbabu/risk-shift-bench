@@ -139,8 +139,10 @@ def audit_codebase_source(source: Path, codebase: str) -> CodebaseSourceAudit:
         raise KeyError(f"unknown v2 codebase: {codebase}") from error
     if not source.is_dir():
         raise RuntimeError(f"upstream source directory is missing: {source}")
+    resolved_source = source.resolve()
+    git_prefix = ["git", "-c", f"safe.directory={resolved_source}", "-C", str(source)]
     observed_commit = subprocess.check_output(
-        ["git", "-C", str(source), "rev-parse", "HEAD"],
+        [*git_prefix, "rev-parse", "HEAD"],
         text=True,
     ).strip()
     if observed_commit != lock.commit:
@@ -149,7 +151,7 @@ def audit_codebase_source(source: Path, codebase: str) -> CodebaseSourceAudit:
             f"found {observed_commit}"
         )
     dirty = subprocess.check_output(
-        ["git", "-C", str(source), "status", "--porcelain", "--untracked-files=all"],
+        [*git_prefix, "status", "--porcelain", "--untracked-files=all"],
         text=True,
     ).strip()
     if dirty:

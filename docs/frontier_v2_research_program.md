@@ -266,6 +266,21 @@ best seed is not substituted for the prespecified replicate distribution.
 Deep OR-Gym and MiniGrid references and both five-seed Safety-Gymnasium
 PPO-Lagrangian/CPO references remain incomplete gates.
 
+The pooled-development Double-DQN adapter is now implemented in
+`experiments/frontier_v2_double_dqn.py` and bound to implementation digest
+`9ed99d797067a3bdc1bd556a5167c05cb07456ed6068eaf4111a2e01f22a8816`.
+It preserves the pinned CleanRL MLP/replay structure, adds explicit online
+action selection with target-network evaluation, respects action masks, cycles
+evenly across all four development tasks, and evaluates frozen checkpoints on
+calibration tasks only. Real CUDA smoke runs crossed the 10,000-step learning
+start and completed at 12,000 steps for online knapsack, DynamicObstacles, and
+LavaCrossing. Their two-episode-per-task calibration scores were 0.442, 0.000,
+and 0.000, respectively. These are pipeline diagnostics, not baseline results;
+all five one-million-step seeds remain required.
+The smoke-selected LavaCrossing checkpoint was also reconstructed in a fresh
+network and reproduced its stored calibration score and cost exactly. Full
+runs apply this replay audit to the selected checkpoint from every seed.
+
 `experiments/robust_test_subset_baseline.py` implements a separate
 RPOSST-inspired comparison in the task-composition layer. It greedily selects a
 task subset and uses projected subgradient optimization to fit simplex weights
@@ -312,7 +327,7 @@ MiniGrid suites operate on fully observable compact images, while both Safety
 suites use flattened lidar and proprioceptive observations; four domains
 therefore exceed the prespecified 32-coordinate high-dimensional threshold.
 
-A provenance-bound end-to-end rehearsal has now completed for all 36
+A provenance-bound end-to-end rehearsal previously completed for all 36
 development and all 36 calibration tasks. Each task ran the complete
 three-policy library for one episode and then repeated the run exactly. Each
 split therefore contains 108 episode rows. Both passed task-hash,
@@ -320,9 +335,13 @@ whole-manifest-hash, clean source-commit, dependency-lock, canonical seed-block,
 common-random-number, complete outcome-schema, derived-summary, score-bound,
 deterministic-replay, and runtime-ledger checks. The development and calibration
 runtime sums were 518.04 and 513.55 seconds, respectively. Every artifact is
-also bound to outcome-implementation digest
-`5ea81a98337337f57ae77a96ea3d4cb47b603c53748b268d7dc6428e47d08cd7`,
-so a policy or adapter code change makes the artifact fail the current audit.
+bound to its outcome-implementation digest, so a policy or adapter code change
+makes the artifact fail the current audit. A portability repair now passes the
+exact audited source path to Git's `safe.directory` setting for each read-only
+provenance command. That repair changed the current digest to
+`2c60837f7c36d8b886de5152de206db436a5a5d966b5279587cec121676ee5cf`;
+the earlier rehearsal artifacts are therefore intentionally stale and both
+splits must be rerun before the design can be locked.
 The split manifest hashes remained
 `6de94c6456eccff522e9f9f359d589d10280f551a9616920f17746652a1c235e`
 and `da9faca59d0e1a59e8d98e03d99cdd86b698c5ac618b574492e110d71a2475c2`.

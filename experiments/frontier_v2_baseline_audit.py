@@ -14,6 +14,10 @@ from experiments.frontier_v2_baseline_design import (
     COMPETITIVE_BASELINES,
     baseline_design_summary,
 )
+from experiments.frontier_v2_baseline_runner_hash import (
+    runner_implementation_files,
+    runner_implementation_sha256,
+)
 from experiments.frontier_v2_external_design import (
     all_tasks,
     canonical_sha256,
@@ -109,6 +113,13 @@ def audit_baseline_manifest(
         expected_lock = asdict(BASELINE_SOURCE_LOCKS[baseline.implementation_source])
         if payload.get("source_lock") != expected_lock:
             raise RuntimeError("external baseline source lock changed")
+        expected_files = list(runner_implementation_files(baseline.algorithm))
+        if payload.get("runner_implementation_files") != expected_files:
+            raise RuntimeError("external baseline runner file set changed")
+        if payload.get("runner_implementation_sha256") != runner_implementation_sha256(
+            baseline.algorithm
+        ):
+            raise RuntimeError("external baseline runner implementation changed")
     elif payload.get("source_lock") != {"name": "riskshiftbench_internal"}:
         raise RuntimeError("internal baseline source marker changed")
 
@@ -170,6 +181,9 @@ def audit_baseline_manifest(
         "baseline_implementation_sha256": design[
             "internal_implementation_sha256"
         ],
+        "runner_implementation_sha256": payload.get(
+            "runner_implementation_sha256"
+        ),
         "checkpoint_files_verified": checkpoint_root is not None,
         "selection_rule_verified": True,
         "selected_checkpoints": sorted(

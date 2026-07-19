@@ -71,8 +71,10 @@ def audit_baseline_source(source: Path, source_name: str) -> BaselineSourceAudit
     if not source.is_dir():
         raise RuntimeError(f"baseline source directory is missing: {source}")
 
+    resolved_source = source.resolve()
+    git_prefix = ["git", "-c", f"safe.directory={resolved_source}", "-C", str(source)]
     observed_commit = subprocess.check_output(
-        ["git", "-C", str(source), "rev-parse", "HEAD"],
+        [*git_prefix, "rev-parse", "HEAD"],
         text=True,
     ).strip()
     if observed_commit != lock.commit:
@@ -81,7 +83,7 @@ def audit_baseline_source(source: Path, source_name: str) -> BaselineSourceAudit
             f"found {observed_commit}"
         )
     dirty = subprocess.check_output(
-        ["git", "-C", str(source), "status", "--porcelain", "--untracked-files=all"],
+        [*git_prefix, "status", "--porcelain", "--untracked-files=all"],
         text=True,
     ).strip()
     if dirty:
