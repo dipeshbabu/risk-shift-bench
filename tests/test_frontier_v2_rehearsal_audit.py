@@ -14,6 +14,7 @@ from experiments.frontier_v2_external_design import (
     canonical_episode_seed_base,
     domain_tasks,
     expected_episode_seeds,
+    outcome_implementation_sha256,
     task_manifest_sha256,
     task_sha256,
 )
@@ -42,6 +43,7 @@ def sample_payload(task=None, *, episodes: int = 2) -> dict:
         "task_definition": asdict(task),
         "task_sha256": task_sha256(task),
         "split_manifest_sha256": task_manifest_sha256(all_tasks(task.split)),
+        "outcome_implementation_sha256": outcome_implementation_sha256(),
         "source_audit": {
             "codebase": spec.codebase,
             "expected_commit": lock.commit,
@@ -68,6 +70,12 @@ def sample_payload(task=None, *, episodes: int = 2) -> dict:
                 "policy": policy,
                 "episodes": episodes,
                 "mean_score": 0.5,
+                "minimum_score": 0.5,
+                "maximum_score": 0.5,
+                "mean_raw_utility": 0.0,
+                "failure_probability": 0.0,
+                "mean_cost": 0.0,
+                "mean_steps": 1.0,
             }
             for policy in policies
         },
@@ -80,6 +88,12 @@ def sample_payload(task=None, *, episodes: int = 2) -> dict:
                     "episode": episode,
                     "seed": seeds[episode],
                     "score": 0.5,
+                    "raw_utility": 0.0,
+                    "raw_return": 0.0,
+                    "cost": 0.0,
+                    "failure": False,
+                    "steps": 1,
+                    "successes": 0,
                 }
                 for episode in range(episodes)
             ]
@@ -115,6 +129,13 @@ def test_rehearsal_payload_rejects_stale_task_hash() -> None:
     payload = sample_payload()
     payload["task_sha256"] = "0" * 64
     with pytest.raises(RuntimeError, match="task hash"):
+        audit_rehearsal_payload(payload)
+
+
+def test_rehearsal_payload_rejects_stale_implementation_hash() -> None:
+    payload = sample_payload()
+    payload["outcome_implementation_sha256"] = "0" * 64
+    with pytest.raises(RuntimeError, match="implementation hash"):
         audit_rehearsal_payload(payload)
 
 

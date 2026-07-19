@@ -54,6 +54,25 @@ def test_value_iteration_chooses_better_terminal_action() -> None:
     assert table[0] == 1
 
 
+def test_value_iteration_can_freeze_a_next_state_risk_penalty() -> None:
+    transitions = {
+        0: {
+            0: [(1.0, 1, 0.0, False)],
+            1: [(1.0, 2, 0.0, False)],
+        },
+        1: {0: [(1.0, 1, 1.0, True)]},
+        2: {0: [(1.0, 2, 0.8, True)]},
+    }
+    nominal = transformed_value_iteration_action_table(transitions, gamma=0.99)
+    cautious = transformed_value_iteration_action_table(
+        transitions,
+        gamma=0.99,
+        next_state_penalties={1: 0.5},
+    )
+    assert nominal[0] == 0
+    assert cautious[0] == 1
+
+
 def _empty_image(width: int, height: int):
     return [[[1, 0, 0] for _y in range(height)] for _x in range(width)]
 

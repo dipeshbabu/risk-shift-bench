@@ -262,14 +262,20 @@ MiniGrid suites operate on fully observable compact images, while both Safety
 suites use flattened lidar and proprioceptive observations; four domains
 therefore exceed the prespecified 32-coordinate high-dimensional threshold.
 
-A provenance-bound, development-only end-to-end rehearsal has now completed
-for all 36 development tasks. Each task ran the complete three-policy library
-for one episode and then repeated the run exactly. The resulting 108 episode
-rows passed task-hash, whole-manifest-hash, clean source-commit, dependency-lock,
-canonical seed-block, common-random-number, score-bound, deterministic-replay,
-and runtime-ledger checks. Recorded simulator time was 488.98 seconds. The
-development manifest hash remained
-`6de94c6456eccff522e9f9f359d589d10280f551a9616920f17746652a1c235e`.
+A provenance-bound end-to-end rehearsal has now completed for all 36
+development and all 36 calibration tasks. Each task ran the complete
+three-policy library for one episode and then repeated the run exactly. Each
+split therefore contains 108 episode rows. Both passed task-hash,
+whole-manifest-hash, clean source-commit, dependency-lock, canonical seed-block,
+common-random-number, complete outcome-schema, derived-summary, score-bound,
+deterministic-replay, and runtime-ledger checks. The development and calibration
+runtime sums were 518.04 and 513.55 seconds, respectively. Every artifact is
+also bound to outcome-implementation digest
+`5ea81a98337337f57ae77a96ea3d4cb47b603c53748b268d7dc6428e47d08cd7`,
+so a policy or adapter code change makes the artifact fail the current audit.
+The split manifest hashes remained
+`6de94c6456eccff522e9f9f359d589d10280f551a9616920f17746652a1c235e`
+and `da9faca59d0e1a59e8d98e03d99cdd86b698c5ac618b574492e110d71a2475c2`.
 
 This is full adapter coverage, not a statistically informative policy
 comparison and not evidence that the scripted policy libraries are competitive.
@@ -278,6 +284,27 @@ after all 36 exact task artifacts pass the strict audit and unconditionally
 refuses confirmation. Statistically sized development and calibration runs,
 score-bound stress tests beyond observed trajectories, and trained
 DQN/PPO/safe-RL references remain gates before registration.
+
+The rehearsal also triggered a policy-library repair before any confirmation
+lock. The original CliffWalking fallback used shifted dynamics and all three
+policies were identical on every state. The repaired fallback is planned under
+nominal nonslippery dynamics, while candidates use the observed task dynamics;
+the risk-averse candidate additionally pays a frozen near-cliff state penalty.
+In 20 paired development/calibration episodes per policy, its mean score effect
+was mildly negative on deterministic tasks (-0.0059 to -0.0125) and strongly
+positive on slippery tasks (0.5725 to 0.6979). The fast shifted-model candidate
+gained 0.6315 to 0.7360 on slippery tasks and tied fallback on deterministic
+tasks. FrozenLake now uses the same nominal-versus-shifted distinction: the
+hazard-averse candidate tied fallback on deterministic tasks and gained 0.2391
+to 0.5563 on slippery calibration tasks and 0.3305 to 0.3960 on slippery
+development tasks. These are development diagnostics, not confirmation
+effects.
+
+Taxi candidates disagree with fallback on 8--9% of tabular states, but a
+20-episode paired diagnostic found only rare trajectory changes and effects
+near zero. Taxi is retained as a difficult/null-routing domain; its weakness is
+not hidden by tuning an artificial score effect. Proposal freezing may exclude
+zero-contrast task-policy pairs using development and calibration data only.
 
 The current machine has six CPU cores, 15.8 GB RAM, and a 4 GB GTX 1650, so
 scripted-policy development can run locally, but training or evaluating the

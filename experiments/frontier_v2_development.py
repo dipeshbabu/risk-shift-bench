@@ -20,6 +20,7 @@ from experiments.frontier_v2_external_design import (
     all_tasks,
     canonical_episode_seed_base,
     domain_tasks,
+    outcome_implementation_sha256,
     task_manifest_sha256,
     task_sha256,
 )
@@ -123,6 +124,7 @@ def run_development_task_payload(
         "task_definition": asdict(task),
         "task_sha256": task_sha256(task),
         "split_manifest_sha256": task_manifest_sha256(all_tasks(task.split)),
+        "outcome_implementation_sha256": outcome_implementation_sha256(),
         "source_audit": source_audit_payload,
         "codebase_lock": asdict(CODEBASE_LOCKS[library.codebase]),
         "score_rule": library.score_rule,

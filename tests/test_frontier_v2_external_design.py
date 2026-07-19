@@ -14,6 +14,7 @@ from experiments.frontier_v2_external_design import (
     design_summary,
     domain_tasks,
     expected_episode_seeds,
+    outcome_implementation_sha256,
     task_manifest_sha256,
     validate_design,
 )
@@ -55,6 +56,7 @@ def test_manifest_hash_is_stable_and_order_sensitive() -> None:
     tasks = all_tasks("development")
     assert task_manifest_sha256(tasks) == task_manifest_sha256(tasks)
     assert task_manifest_sha256(tasks) != task_manifest_sha256(list(reversed(tasks)))
+    assert len(outcome_implementation_sha256()) == 64
 
 
 def test_design_summary_contains_no_outcomes_or_execution_authority() -> None:

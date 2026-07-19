@@ -11,6 +11,7 @@ import hashlib
 import json
 from dataclasses import asdict, dataclass
 from math import isfinite
+from pathlib import Path
 from typing import TypeAlias
 
 
@@ -153,7 +154,7 @@ DOMAIN_SPECS = {
         score_rule="bounded_safe_completion_v1",
         score_lower=0.0,
         score_upper=1.0,
-        fallback_policy="native_value_iteration",
+        fallback_policy="nominal_value_iteration",
         candidate_policies=("cliff_averse_value_iteration", "fast_value_iteration"),
         competitive_baselines=("tabular_oracle", "q_learning_reference"),
     ),
@@ -257,11 +258,34 @@ STREAM_SEED_BASES = {
 DOMAIN_SEED_STRIDE = 100_000
 TASK_SEED_STRIDE = 10_000
 MAX_EPISODES_PER_TASK_STREAM = TASK_SEED_STRIDE
+OUTCOME_IMPLEMENTATION_FILES = (
+    "experiments/frontier_v2_external_design.py",
+    "experiments/frontier_v2_external_adapters.py",
+    "experiments/frontier_v2_development.py",
+    "experiments/frontier_v2_source_audit.py",
+)
 
 
 def canonical_sha256(value: object) -> str:
     encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def outcome_implementation_sha256(repository_root: Path | None = None) -> str:
+    """Hash every repository file that defines a task outcome artifact."""
+
+    root = Path(__file__).resolve().parents[1] if repository_root is None else repository_root
+    digest = hashlib.sha256()
+    for relative in OUTCOME_IMPLEMENTATION_FILES:
+        path = root / relative
+        if not path.is_file():
+            raise RuntimeError(f"outcome implementation file is missing: {path}")
+        canonical_content = path.read_bytes().replace(b"\r\n", b"\n")
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(canonical_content)
+        digest.update(b"\0")
+    return digest.hexdigest()
 
 
 def _task(
@@ -662,6 +686,8 @@ def design_summary() -> dict:
             "any environment; confirmation execution remains prohibited until registration."
         ),
         "confirmation_execution": "prohibited_before_external_registration",
+        "outcome_implementation_files": list(OUTCOME_IMPLEMENTATION_FILES),
+        "outcome_implementation_sha256": outcome_implementation_sha256(),
         "codebase_locks": {
             name: asdict(lock) for name, lock in CODEBASE_LOCKS.items()
         },

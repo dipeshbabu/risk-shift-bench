@@ -113,6 +113,7 @@ def transformed_value_iteration_action_table(
     gamma: float,
     cliff_multiplier: float = 1.0,
     step_multiplier: float = 1.0,
+    next_state_penalties: dict[int, float] | None = None,
 ) -> dict[int, int]:
     """Solve a finite tabular MDP with a frozen reward transformation."""
 
@@ -120,6 +121,11 @@ def transformed_value_iteration_action_table(
         raise ValueError("gamma must lie in [0, 1)")
     if cliff_multiplier <= 0.0 or step_multiplier <= 0.0:
         raise ValueError("reward multipliers must be positive")
+    penalties = next_state_penalties or {}
+    if any(state not in transitions for state in penalties):
+        raise ValueError("next-state penalty references an unknown state")
+    if any(not math.isfinite(value) or value < 0.0 for value in penalties.values()):
+        raise ValueError("next-state penalties must be finite and nonnegative")
 
     def transformed_reward(reward: float) -> float:
         if reward <= -100.0:
@@ -137,6 +143,7 @@ def transformed_value_iteration_action_table(
                     probability
                     * (
                         transformed_reward(float(reward))
+                        - penalties.get(int(next_state), 0.0)
                         + (0.0 if terminated else gamma * values[int(next_state)])
                     )
                     for probability, next_state, reward, terminated in outcomes
@@ -155,6 +162,7 @@ def transformed_value_iteration_action_table(
                 probability
                 * (
                     transformed_reward(float(reward))
+                    - penalties.get(int(next_state), 0.0)
                     + (0.0 if terminated else gamma * values[int(next_state)])
                 )
                 for probability, next_state, reward, terminated in outcomes
@@ -171,21 +179,30 @@ def _gymnasium_policy_table(task: V2ExternalTask, policy: str):
     if task.domain == "gymnasium_frozenlake":
         from gymnasium.envs.toy_text.frozen_lake import generate_random_map
 
+        actual_slippery = bool(parameters["is_slippery"])
         description = generate_random_map(
             size=int(parameters["map_size"]),
             p=float(parameters["frozen_probability"]),
             seed=int(parameters["map_seed"]),
         )
         schedules = {
-            "nominal_value_iteration": ((1.0, 0.0, 0.0), 0.99),
-            "hazard_averse_value_iteration": ((1.0, -2.0, -0.005), 0.99),
-            "short_path_value_iteration": ((1.0, -0.5, -0.02), 0.95),
+            "nominal_value_iteration": ((1.0, 0.0, 0.0), 0.99, False),
+            "hazard_averse_value_iteration": (
+                (1.0, -2.0, -0.005),
+                0.99,
+                actual_slippery,
+            ),
+            "short_path_value_iteration": (
+                (1.0, -0.5, -0.02),
+                0.95,
+                actual_slippery,
+            ),
         }
-        reward_schedule, gamma = schedules[policy]
+        reward_schedule, gamma, planning_slippery = schedules[policy]
         planning = gym.make(
             task.environment_id,
             desc=description,
-            is_slippery=bool(parameters["is_slippery"]),
+            is_slippery=planning_slippery,
             success_rate=float(parameters["success_rate"]),
             reward_schedule=reward_schedule,
         )
@@ -200,16 +217,34 @@ def _gymnasium_policy_table(task: V2ExternalTask, policy: str):
             planning.close()
 
     if task.domain == "gymnasium_cliffwalking":
+        actual_slippery = bool(parameters["is_slippery"])
+        settings = {
+            "nominal_value_iteration": (0.99, 1.0, 1.0, 0.0, False),
+            "cliff_averse_value_iteration": (
+                0.995,
+                3.0,
+                1.0,
+                5.0,
+                actual_slippery,
+            ),
+            "fast_value_iteration": (0.90, 1.0, 1.0, 0.0, actual_slippery),
+        }
+        (
+            gamma,
+            cliff_multiplier,
+            step_multiplier,
+            proximity_penalty,
+            planning_slippery,
+        ) = settings[policy]
         planning = gym.make(
             task.environment_id,
-            is_slippery=bool(parameters["is_slippery"]),
+            is_slippery=planning_slippery,
         )
-        settings = {
-            "native_value_iteration": (0.99, 1.0, 1.0),
-            "cliff_averse_value_iteration": (0.995, 3.0, 1.0),
-            "fast_value_iteration": (0.90, 1.0, 1.0),
+        next_state_penalties = {
+            state: proximity_penalty
+            for state in planning.unwrapped.P
+            if state // 12 == 2 and 1 <= state % 12 <= 10
         }
-        gamma, cliff_multiplier, step_multiplier = settings[policy]
         try:
             return (
                 transformed_value_iteration_action_table(
@@ -217,6 +252,7 @@ def _gymnasium_policy_table(task: V2ExternalTask, policy: str):
                     gamma=gamma,
                     cliff_multiplier=cliff_multiplier,
                     step_multiplier=step_multiplier,
+                    next_state_penalties=next_state_penalties,
                 ),
                 None,
             )

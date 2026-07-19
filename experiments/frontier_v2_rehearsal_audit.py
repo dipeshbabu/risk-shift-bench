@@ -5,10 +5,11 @@ from __future__ import annotations
 import argparse
 import json
 import math
-from dataclasses import asdict
+from dataclasses import asdict, fields
 from pathlib import Path
 from statistics import fmean
 
+from experiments.frontier_v2_external_adapters import V2EpisodeOutcome
 from experiments.frontier_v2_external_design import (
     CODEBASE_LOCKS,
     DOMAIN_SPECS,
@@ -17,12 +18,14 @@ from experiments.frontier_v2_external_design import (
     canonical_sha256,
     domain_tasks,
     expected_episode_seeds,
+    outcome_implementation_sha256,
     task_manifest_sha256,
     task_sha256,
 )
 
 
 TASK_DESIGN = "riskshiftbench-frontier-v2-development-task-v1"
+OUTCOME_FIELDS = {field.name for field in fields(V2EpisodeOutcome)}
 
 
 def _expected_task(payload: dict):
@@ -50,6 +53,8 @@ def _audit_provenance(payload: dict, task) -> None:
     expected_manifest = task_manifest_sha256(all_tasks(task.split))
     if payload.get("split_manifest_sha256") != expected_manifest:
         raise RuntimeError("split manifest hash does not match the frozen design")
+    if payload.get("outcome_implementation_sha256") != outcome_implementation_sha256():
+        raise RuntimeError("outcome implementation hash does not match the current code")
 
     spec = DOMAIN_SPECS[task.domain]
     lock = CODEBASE_LOCKS[spec.codebase]
@@ -137,6 +142,8 @@ def audit_rehearsal_payload(payload: dict) -> dict:
         elif seeds != reference_seeds:
             raise RuntimeError(f"common-random-number pairing failed for {domain}")
         for row in rows:
+            if set(row) != OUTCOME_FIELDS:
+                raise RuntimeError(f"outcome row schema mismatch for {domain}/{policy}")
             if row["domain"] != domain or row["task"] != payload["task"]:
                 raise RuntimeError(f"row metadata mismatch for {domain}/{policy}")
             if row["policy"] != policy:
@@ -144,20 +151,47 @@ def audit_rehearsal_payload(payload: dict) -> dict:
             score = float(row["score"])
             if not spec.score_lower <= score <= spec.score_upper:
                 raise RuntimeError(f"score bound violation for {domain}/{policy}")
+            numeric_values = [
+                float(row[name])
+                for name in ("raw_utility", "raw_return", "cost")
+            ]
+            if not all(math.isfinite(value) for value in numeric_values):
+                raise RuntimeError(f"nonfinite outcome metric for {domain}/{policy}")
+            if (
+                type(row["failure"]) is not bool
+                or type(row["steps"]) is not int
+                or row["steps"] < 0
+                or type(row["successes"]) is not int
+                or row["successes"] < 0
+            ):
+                raise RuntimeError(f"invalid outcome diagnostic for {domain}/{policy}")
             observed_scores.append(score)
         summary = payload.get("summaries", {}).get(policy, {})
-        if (
+        expected_summary = {
+            "mean_score": fmean(float(row["score"]) for row in rows),
+            "minimum_score": min(float(row["score"]) for row in rows),
+            "maximum_score": max(float(row["score"]) for row in rows),
+            "mean_raw_utility": fmean(float(row["raw_utility"]) for row in rows),
+            "failure_probability": fmean(float(row["failure"]) for row in rows),
+            "mean_cost": fmean(float(row["cost"]) for row in rows),
+            "mean_steps": fmean(float(row["steps"]) for row in rows),
+        }
+        metadata_mismatch = (
             summary.get("domain") != domain
             or summary.get("task") != task.name
             or summary.get("policy") != policy
             or int(summary.get("episodes", 0)) != episode_count
-            or not math.isclose(
-                float(summary.get("mean_score", float("nan"))),
-                fmean(float(row["score"]) for row in rows),
+        )
+        values_match = all(
+            math.isclose(
+                float(summary.get(name, float("nan"))),
+                expected,
                 rel_tol=1e-12,
                 abs_tol=1e-12,
             )
-        ):
+            for name, expected in expected_summary.items()
+        )
+        if metadata_mismatch or not values_match:
             raise RuntimeError(f"outcome summary does not match rows for {domain}/{policy}")
     return {
         "domain": domain,
@@ -165,6 +199,7 @@ def audit_rehearsal_payload(payload: dict) -> dict:
         "split": task.split,
         "task_sha256": task_sha256(task),
         "split_manifest_sha256": task_manifest_sha256(all_tasks(task.split)),
+        "outcome_implementation_sha256": outcome_implementation_sha256(),
         "source_commit": CODEBASE_LOCKS[spec.codebase].commit,
         "policy_count": len(expected_policies),
         "episodes_per_policy": len(reference_seeds),
@@ -225,6 +260,7 @@ def audit_split_coverage_payloads(
         "scope": "Development/calibration only; confirmation is prohibited.",
         "split": split,
         "split_manifest_sha256": task_manifest_sha256(all_tasks(split)),
+        "outcome_implementation_sha256": outcome_implementation_sha256(),
         "complete_split": True,
         "domain_count": len(domain_task_counts),
         "task_count": len(records),
