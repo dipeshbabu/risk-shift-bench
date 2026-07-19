@@ -29,9 +29,10 @@ uv run python -m experiments.pilot_verified_robustness
 ```
 
 All outputs under `artifacts/frontier_pilot_verified_robustness_v1` are
-post-confirmation. For the next independent study, use the unregistered draft
-in [`preregistration_external_domains_v1.md`](preregistration_external_domains_v1.md)
-and register its final hashes before running any external confirmation task.
+post-confirmation. The next independent study has a locked design documented in
+[`preregistration_external_domains_v1.md`](preregistration_external_domains_v1.md).
+The design is publicly registered at [OSF](https://doi.org/10.17605/OSF.IO/C576U),
+and its pilot and final commands require the finalized registered wrapper.
 
 Smoke benchmark:
 
