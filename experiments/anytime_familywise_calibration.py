@@ -11,7 +11,9 @@ import argparse
 import hashlib
 import json
 import random
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
+from functools import partial
 from math import sqrt
 from pathlib import Path
 
@@ -165,6 +167,71 @@ def run_synthetic_trial(
     )
 
 
+def _run_indexed_synthetic_trial(
+    trial_index: int,
+    *,
+    scenario: SyntheticScenario,
+    strategy: str,
+    seed: int,
+    familywise_alpha: float,
+    effect_margin: float,
+    e_process_method: str,
+    maximum_observations_per_task: int,
+    global_observation_budget: int,
+    forced_initial_observations: int,
+) -> SyntheticTrialResult:
+    return run_synthetic_trial(
+        scenario,
+        strategy=strategy,
+        seed=seed + trial_index,
+        familywise_alpha=familywise_alpha,
+        effect_margin=effect_margin,
+        e_process_method=e_process_method,
+        maximum_observations_per_task=maximum_observations_per_task,
+        global_observation_budget=global_observation_budget,
+        forced_initial_observations=forced_initial_observations,
+    )
+
+
+def collect_synthetic_trials(
+    scenario: SyntheticScenario,
+    *,
+    strategy: str,
+    trials: int,
+    seed: int,
+    familywise_alpha: float,
+    effect_margin: float,
+    e_process_method: str,
+    maximum_observations_per_task: int,
+    global_observation_budget: int,
+    forced_initial_observations: int,
+    workers: int,
+) -> list[SyntheticTrialResult]:
+    """Run deterministic trials serially or in spawned worker processes."""
+
+    if trials <= 0:
+        raise ValueError("trials must be positive")
+    if workers <= 0:
+        raise ValueError("workers must be positive")
+    worker = partial(
+        _run_indexed_synthetic_trial,
+        scenario=scenario,
+        strategy=strategy,
+        seed=seed,
+        familywise_alpha=familywise_alpha,
+        effect_margin=effect_margin,
+        e_process_method=e_process_method,
+        maximum_observations_per_task=maximum_observations_per_task,
+        global_observation_budget=global_observation_budget,
+        forced_initial_observations=forced_initial_observations,
+    )
+    if workers == 1:
+        return [worker(trial_index) for trial_index in range(trials)]
+    chunksize = max(1, trials // (workers * 20))
+    with ProcessPoolExecutor(max_workers=workers) as executor:
+        return list(executor.map(worker, range(trials), chunksize=chunksize))
+
+
 def wilson_interval(successes: int, trials: int, z_value: float = 1.959963984540054) -> tuple[float, float]:
     if trials <= 0:
         raise ValueError("trials must be positive")
@@ -198,23 +265,23 @@ def summarize_trials(
     maximum_observations_per_task: int = 100,
     global_observation_budget: int = 2_300,
     forced_initial_observations: int = 2,
+    workers: int = 1,
 ) -> dict:
     if trials <= 0:
         raise ValueError("trials must be positive")
-    results = [
-        run_synthetic_trial(
-            scenario,
-            strategy=strategy,
-            seed=seed + trial_index,
-            familywise_alpha=familywise_alpha,
-            effect_margin=effect_margin,
-            e_process_method=e_process_method,
-            maximum_observations_per_task=maximum_observations_per_task,
-            global_observation_budget=global_observation_budget,
-            forced_initial_observations=forced_initial_observations,
-        )
-        for trial_index in range(trials)
-    ]
+    results = collect_synthetic_trials(
+        scenario,
+        strategy=strategy,
+        trials=trials,
+        seed=seed,
+        familywise_alpha=familywise_alpha,
+        effect_margin=effect_margin,
+        e_process_method=e_process_method,
+        maximum_observations_per_task=maximum_observations_per_task,
+        global_observation_budget=global_observation_budget,
+        forced_initial_observations=forced_initial_observations,
+        workers=workers,
+    )
     false_accept_families = sum(result.false_accept for result in results)
     interval = wilson_interval(false_accept_families, trials)
     positive_count = results[0].positive_task_count
@@ -231,6 +298,7 @@ def summarize_trials(
         "maximum_observations_per_task": maximum_observations_per_task,
         "global_observation_budget": global_observation_budget,
         "forced_initial_observations": forced_initial_observations,
+        "workers": workers,
         "familywise_false_accept_rate": false_accept_families / trials,
         "familywise_false_accept_wilson_95_ci": list(interval),
         "mean_false_accept_count": sum(
@@ -287,6 +355,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--maximum-observations-per-task", type=int, default=100)
     parser.add_argument("--global-observation-budget", type=int, default=2_300)
     parser.add_argument("--forced-initial-observations", type=int, default=2)
+    parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--output", type=Path)
     return parser.parse_args()
 
@@ -321,6 +390,7 @@ def main() -> None:
             maximum_observations_per_task=args.maximum_observations_per_task,
             global_observation_budget=args.global_observation_budget,
             forced_initial_observations=args.forced_initial_observations,
+            workers=args.workers,
         )
         for scenario in selected_scenarios
         for strategy in strategies

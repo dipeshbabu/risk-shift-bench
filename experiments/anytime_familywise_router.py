@@ -8,10 +8,10 @@ The acceptance process tests a task-level null of the form
     H_i: E[X_{i,t} | F_{t-1}] <= effect_margin,
 
 where the paired candidate-minus-fallback observations are known to lie in a
-fixed interval.  A finite mixture of Hoeffding test supermartingales gives an
-e-process for each task.  Prespecified task-level alpha weights and a union
-bound then control the probability of accepting any null proposal, even when
-tasks are sampled and stopped adaptively.
+fixed interval. Finite mixtures of Hoeffding or bounded-betting test
+supermartingales give an e-process for each task. Prespecified task-level alpha
+weights and a union bound then control the probability of accepting any null
+proposal, even when tasks are sampled and stopped adaptively.
 """
 
 from __future__ import annotations

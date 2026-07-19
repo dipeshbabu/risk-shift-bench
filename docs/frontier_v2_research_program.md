@@ -24,7 +24,7 @@ requirements:
 
 ## Proposed statistical object
 
-For proposal (i\), let (X_{i,t}\in[a_i,b_i]\) be the paired
+For proposal \(i\), let \(X_{i,t}\in[a_i,b_i]\) be the paired
 candidate-minus-fallback score difference from the next pilot unit. Scores and
 bounds are fixed before confirmation. The deployment margin is
 \(\delta_i\geq 0\), and the task-level null is
@@ -47,7 +47,7 @@ E_{i,n}(\lambda)=
 
 V2 mixes a prespecified finite grid of betting fractions. A convex mixture of
 nonnegative test supermartingales remains a test supermartingale. Proposal
-\(i\) is deployed when its mixture e-process reaches (1/\alpha_i\), where the
+\(i\) is deployed when its mixture e-process reaches \(1/\alpha_i\), where the
 task weights are frozen from development evidence and satisfy
 \(\sum_i\alpha_i\leq\alpha\).
 
@@ -66,8 +66,8 @@ rule, and sampling may stop at arbitrary data-dependent times. Then
 
 Proof sketch: each task mixture is an e-process under its null. Optional
 skipping preserves the supermartingale property under predictable adaptive
-allocation. Ville's inequality bounds the probability that task (i\) ever
-crosses (1/\alpha_i\) by \(\alpha_i\). A union bound completes the result. No
+allocation. Ville's inequality bounds the probability that task \(i\) ever
+crosses \(1/\alpha_i\) by \(\alpha_i\). A union bound completes the result. No
 independence assumption across tasks is needed; the conditional validity of
 the next within-task observation is the substantive assumption.
 
@@ -80,7 +80,7 @@ obeys
 >\sum_i w_i R_i\delta_i\geq0,
 \]
 
-where (R_i\) records candidate deployment. This is a familywise lower bound
+where \(R_i\) records candidate deployment. This is a familywise lower bound
 on expected improvement over fallback, not an oracle-regret guarantee and not
 a guarantee about every finite final sample.
 
@@ -88,7 +88,7 @@ The reference implementation is
 `experiments/anytime_familywise_router.py`. It contains two e-processes. A
 finite Hoeffding mixture is the conservative validity baseline. The primary
 development method is a mixture of bounded betting processes. After mapping
-the observation to (Y_{i,t}\in[0,1]\) with null mean (q_i\), each component
+the observation to \(Y_{i,t}\in[0,1]\) with null mean \(q_i\), each component
 updates as
 
 \[
@@ -123,6 +123,35 @@ style rule whose total paired-sample requirement scales with task difficulty,
 while retaining the same anytime familywise guarantee. Efficiency is evaluated
 at identical candidate-plus-fallback episode budgets.
 
+The first transparent reference is now implemented in
+`experiments/familywise_policy_baselines.py`. For task \(i\), it spends the
+one-sided error budget over sample sizes as
+
+\[
+\gamma_{i,n}=\frac{6\alpha_i}{\pi^2n^2},\qquad
+r_{i,n}=(b_i-a_i)
+\sqrt{\frac{\log(1/\gamma_{i,n})}{2n}}.
+\]
+
+Hoeffding's inequality and
+
+\[
+\sum_{n=1}^{\infty}\gamma_{i,n}=\alpha_i
+\]
+
+give a time-uniform lower confidence sequence
+\(\bar X_{i,n}-r_{i,n}\) with task-level error at most \(\alpha_i\).
+A separate upper sequence supports safe futility decisions. The racing rule
+samples an unresolved task with the widest interval and removes a task after
+either boundary crosses the deployment margin. On the simultaneous coverage
+event, a task with gap \(\Delta_i=|\mu_i-\delta_i|>0\) is resolved no later
+than the first \(n\) satisfying \(2r_{i,n}<\Delta_i\), subject to its frozen
+per-task cap. Thus, when the global cap is nonbinding, the total sample count
+is at most the sum of these task-specific resolution bounds. This baseline is
+deliberately conservative, but it supplies an implementation-checkable
+familywise proof and a concrete gap-dependent cost statement against which
+the betting allocation can be judged.
+
 ## Required baselines
 
 Every comparison must receive the same pilot episode budget and the same
@@ -142,6 +171,13 @@ candidate/fallback pairs.
 
 The primary comparisons are familywise-valid methods. Candidate-everywhere and
 fit-only routing remain descriptive upper-recall references.
+
+`experiments/familywise_policy_comparison.py` implements paired synthetic
+comparisons for fixed-sample Hoeffding tests with Bonferroni or Holm correction,
+fixed-sample sign tests with Bonferroni or Holm correction, the alpha-spending
+racing rule, the Hoeffding-mixture router, and the betting-mixture router. The
+sign methods test an independent sign null rather than the conditional-mean
+null and are labeled separately; they are not interchangeable guarantees.
 
 ## External benchmark target
 
@@ -210,20 +246,30 @@ not determine whether final results are published.
 
 These numbers are implementation diagnostics, not confirmation results. With
 23 bounded synthetic tasks, familywise alpha 0.05, a maximum of 200
-observations per task, and a shared budget of 1,150 observations, 1,000
-global-null families produced a false-acceptance rate of 0.001 under both
-uniform and resolution allocation. The Wilson 95% interval was
-[0.0002, 0.0056]. This is consistent with the
-registered target being conservative, but it is not a substitute for the
-proof or the planned 10,000-family calibration.
+observations per task, and a shared budget of 1,150 observations, the completed
+10,000-family global-null gate produced 37 false-deployment families under
+uniform allocation: rate 0.0037, Wilson 95% interval [0.00269, 0.00510]. The
+resolution allocation produced 54: rate 0.0054, interval [0.00414, 0.00704].
+Both interval upper bounds are below 0.01 and far below the 0.05 familywise
+target. This checks the implementation under adaptive interleaving; the theorem,
+not simulation, supplies the validity claim.
 
-In 300 paired-stream mixed-effect families at the same budget, the betting
-process with uniform allocation accepted 12.8% of truly positive tasks and
-produced mean equal-task expected improvement 0.0211. Resolution allocation
-accepted 28.3% and produced 0.0386. Neither strategy falsely accepted a null task in that
-run. The improvement shows that adaptive allocation can matter under a binding
-global budget. The next development stage must compare this heuristic with a
-principled allocation rule and report uncertainty over efficiency differences.
+In 300 paired-stream mixed-effect families at the same budget, uniform betting
+accepted 11.1% of truly positive tasks and produced mean equal-task expected
+improvement 0.0187. Resolution allocation accepted 27.8% and produced 0.0382.
+The paired improvement difference was 0.0194 with a normal 95% interval
+[0.0173, 0.0215], and the paired positive-task acceptance-rate difference was
+0.1667 [0.1518, 0.1816]. Neither betting strategy falsely accepted a null task
+in that run.
+
+At the same maximum budget, fixed-sample Hoeffding with either Bonferroni or
+Holm accepted 15.2% of positive tasks, the uniform Hoeffding mixture accepted
+8.3%, and alpha-spending racing accepted 1.5%. The fixed sign methods accepted
+23.6%, but they use a distinct independent-sign null and had a 0.0067 empirical
+false-deployment rate in these 300 families. The results establish that the
+active betting heuristic can materially improve utility under a binding budget,
+while the conservative racing baseline exposes the remaining need for a tighter
+principled allocation rule.
 
 ## Evidential firewall
 

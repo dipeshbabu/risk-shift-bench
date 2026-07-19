@@ -7,6 +7,7 @@ import pytest
 from experiments.anytime_familywise_calibration import (
     SyntheticScenario,
     bounded_two_point_observation,
+    collect_synthetic_trials,
     run_synthetic_trial,
     summarize_trials,
     task_stream_seed,
@@ -73,6 +74,41 @@ def test_summary_is_deterministic_for_fixed_seed() -> None:
     )
     assert first == second
     assert first["trials"] == 5
+
+
+def test_trial_collection_matches_direct_indexing() -> None:
+    scenario = SyntheticScenario(
+        name="small",
+        task_means=(("a", -0.5), ("b", 0.0), ("c", 0.5)),
+    )
+    results = collect_synthetic_trials(
+        scenario,
+        strategy="uniform",
+        trials=3,
+        seed=14,
+        familywise_alpha=0.05,
+        effect_margin=0.0,
+        e_process_method="betting_mixture",
+        maximum_observations_per_task=10,
+        global_observation_budget=20,
+        forced_initial_observations=1,
+        workers=1,
+    )
+    direct = [
+        run_synthetic_trial(
+            scenario,
+            strategy="uniform",
+            seed=14 + index,
+            familywise_alpha=0.05,
+            effect_margin=0.0,
+            e_process_method="betting_mixture",
+            maximum_observations_per_task=10,
+            global_observation_budget=20,
+            forced_initial_observations=1,
+        )
+        for index in range(3)
+    ]
+    assert results == direct
 
 
 def test_invalid_synthetic_mean_is_rejected() -> None:
