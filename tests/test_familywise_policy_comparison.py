@@ -13,6 +13,7 @@ from experiments.familywise_policy_comparison import (
 SMALL_SCENARIO = SyntheticScenario(
     name="small",
     task_means=(("negative", -0.5), ("null", 0.0), ("positive", 0.5)),
+    planning_effect_gaps=(("negative", 0.4), ("null", 0.1), ("positive", 0.4)),
 )
 
 

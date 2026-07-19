@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from math import exp, isfinite, log, log1p
+from math import ceil, exp, isfinite, log, log1p, sqrt
 
 
 DEFAULT_ETA_GRID = (0.125, 0.25, 0.5, 1.0, 2.0, 4.0)
@@ -49,6 +49,75 @@ def _mixture_log_weights(component_count: int) -> tuple[float, ...]:
     return tuple(log(weight / total) for weight in raw)
 
 
+def betting_component_growth_lower_bound(
+    standardized_effect_gap: float,
+    betting_fraction: float,
+) -> float:
+    """Worst-case conditional expected log growth for ``1 + f X``."""
+
+    if not 0.0 < standardized_effect_gap <= 1.0:
+        raise ValueError("standardized_effect_gap must lie in (0, 1]")
+    if not 0.0 < betting_fraction < 1.0:
+        raise ValueError("betting_fraction must lie in (0, 1)")
+    return 0.5 * log(
+        1.0 - betting_fraction**2
+    ) + 0.5 * standardized_effect_gap * log(
+        (1.0 + betting_fraction) / (1.0 - betting_fraction)
+    )
+
+
+def betting_resolution_sample_bound(
+    effect_gap: float,
+    *,
+    alpha: float,
+    beta: float,
+    observation_lower: float = -1.0,
+    observation_upper: float = 1.0,
+    effect_margin: float = 0.0,
+    betting_fraction_grid: tuple[float, ...] = DEFAULT_BETTING_FRACTIONS,
+) -> tuple[int, float]:
+    """Return a high-probability task-resolution quota and its component.
+
+    The observation interval must be symmetric around the deployment margin.
+    The bound applies when the true conditional-mean gap is at least
+    ``effect_gap`` in either direction.
+    """
+
+    if not 0.0 < alpha < 1.0 or not 0.0 < beta < 1.0:
+        raise ValueError("alpha and beta must lie strictly between zero and one")
+    if observation_lower >= observation_upper:
+        raise ValueError("observation bounds must be ordered")
+    radius = (observation_upper - observation_lower) / 2.0
+    midpoint = (observation_upper + observation_lower) / 2.0
+    if abs(effect_margin - midpoint) > 1e-12:
+        raise ValueError("certified betting bound requires a midpoint effect margin")
+    if not 0.0 < effect_gap <= radius:
+        raise ValueError("effect_gap must lie within the symmetric observation radius")
+    log_weights = _mixture_log_weights(len(betting_fraction_grid))
+    threshold = log(1.0 / alpha)
+    standardized_gap = effect_gap / radius
+    candidates = []
+    for fraction, log_weight in zip(
+        betting_fraction_grid, log_weights, strict=True
+    ):
+        growth = betting_component_growth_lower_bound(
+            standardized_gap, fraction
+        )
+        if growth <= 0.0:
+            continue
+        increment_range = log((1.0 + fraction) / (1.0 - fraction))
+        deviation = increment_range * sqrt(log(1.0 / beta) / 2.0)
+        required_log_growth = threshold - log_weight
+        root = (
+            deviation
+            + sqrt(deviation**2 + 4.0 * growth * required_log_growth)
+        ) / (2.0 * growth)
+        candidates.append((max(1, ceil(root**2)), fraction))
+    if not candidates:
+        raise ValueError("betting grid has no positive-growth component for the gap")
+    return min(candidates)
+
+
 @dataclass(frozen=True)
 class AnytimeFamilywisePlan:
     """Frozen statistical and budget choices for a proposal family."""
@@ -65,6 +134,8 @@ class AnytimeFamilywisePlan:
     e_process_method: str = "betting_mixture"
     eta_grid: tuple[float, ...] = DEFAULT_ETA_GRID
     betting_fraction_grid: tuple[float, ...] = DEFAULT_BETTING_FRACTIONS
+    planning_effect_gaps: tuple[tuple[str, float], ...] = ()
+    resolution_familywise_beta: float = 0.05
 
     def __post_init__(self) -> None:
         if not self.task_names:
@@ -101,6 +172,10 @@ class AnytimeFamilywisePlan:
             raise ValueError("betting fractions must lie strictly between zero and one")
         if len(set(self.betting_fraction_grid)) != len(self.betting_fraction_grid):
             raise ValueError("betting fraction entries must be unique")
+        if not 0.0 < self.resolution_familywise_beta < 1.0:
+            raise ValueError(
+                "resolution_familywise_beta must lie strictly between zero and one"
+            )
 
         if self.task_weights:
             weight_names = [name for name, _weight in self.task_weights]
@@ -110,6 +185,22 @@ class AnytimeFamilywisePlan:
                 raise ValueError("task weights must cover exactly the proposal family")
             if any(not isfinite(weight) or weight <= 0.0 for _name, weight in self.task_weights):
                 raise ValueError("task weights must be finite and positive")
+        if self.planning_effect_gaps:
+            gap_names = [name for name, _gap in self.planning_effect_gaps]
+            if len(set(gap_names)) != len(gap_names):
+                raise ValueError("planning effect-gap names must be unique")
+            if set(gap_names) != set(self.task_names):
+                raise ValueError(
+                    "planning effect gaps must cover exactly the proposal family"
+                )
+            radius = self.observation_width / 2.0
+            if any(
+                not isfinite(gap) or not 0.0 < gap <= radius
+                for _name, gap in self.planning_effect_gaps
+            ):
+                raise ValueError(
+                    "planning effect gaps must be finite, positive, and within the bounds"
+                )
 
     @property
     def observation_width(self) -> float:
@@ -135,6 +226,24 @@ class AnytimeFamilywisePlan:
         except KeyError as error:
             raise KeyError(f"unknown proposal task: {task}") from error
         return self.futility_familywise_alpha * weight
+
+    def planning_effect_gap(self, task: str) -> float:
+        if not self.planning_effect_gaps:
+            raise RuntimeError("no planning effect gaps are configured")
+        try:
+            return dict(self.planning_effect_gaps)[task]
+        except KeyError as error:
+            raise KeyError(f"unknown proposal task: {task}") from error
+
+
+@dataclass(frozen=True)
+class CertifiedSampleTarget:
+    task: str
+    planning_effect_gap: float
+    required_observations: int
+    scheduled_observations: int
+    betting_fraction: float
+    clipped_by_task_cap: bool
 
 
 @dataclass(frozen=True)
@@ -179,6 +288,38 @@ class AnytimeFamilywiseRouter:
         self._futility_component_logs = {
             task: list(self._log_weights) for task in plan.task_names
         }
+        self._certified_sample_targets: dict[str, CertifiedSampleTarget] = {}
+        if plan.planning_effect_gaps:
+            if plan.e_process_method != "betting_mixture":
+                raise ValueError(
+                    "certified sample targets require the betting-mixture method"
+                )
+            normalized_weights = plan._normalized_weights()
+            for task in plan.task_names:
+                bound, fraction = betting_resolution_sample_bound(
+                    plan.planning_effect_gap(task),
+                    alpha=min(plan.acceptance_alpha(task), plan.futility_alpha(task)),
+                    beta=(
+                        plan.resolution_familywise_beta
+                        * normalized_weights[task]
+                    ),
+                    observation_lower=plan.observation_lower,
+                    observation_upper=plan.observation_upper,
+                    effect_margin=plan.effect_margin,
+                    betting_fraction_grid=plan.betting_fraction_grid,
+                )
+                self._certified_sample_targets[task] = CertifiedSampleTarget(
+                    task=task,
+                    planning_effect_gap=plan.planning_effect_gap(task),
+                    required_observations=bound,
+                    scheduled_observations=min(
+                        bound, plan.maximum_observations_per_task
+                    ),
+                    betting_fraction=fraction,
+                    clipped_by_task_cap=(
+                        bound > plan.maximum_observations_per_task
+                    ),
+                )
 
     def _validate_task(self, task: str) -> None:
         if task not in self._observations:
@@ -285,19 +426,24 @@ class AnytimeFamilywiseRouter:
     ) -> str | None:
         """Choose the next unresolved task without affecting test validity.
 
-        ``uniform`` balances sample counts.  ``resolution`` first forces a
-        small number of samples per task, then chooses the task with the
-        smallest plug-in estimate of additional samples needed for either
-        terminal decision.  The allocation rule may affect efficiency, but
-        the e-process thresholds remain valid under predictable interleaving.
+        ``uniform`` balances sample counts. ``resolution`` uses a plug-in
+        estimate of evidence still needed. ``certified`` completes the smallest
+        frozen high-probability resolution quotas first, then falls back to the
+        plug-in rule. Allocation affects efficiency but not e-process validity.
         """
 
-        if strategy not in {"uniform", "resolution"}:
-            raise ValueError("strategy must be 'uniform' or 'resolution'")
+        if strategy not in {"uniform", "resolution", "certified"}:
+            raise ValueError(
+                "strategy must be 'uniform', 'resolution', or 'certified'"
+            )
         if forced_initial_observations <= 0:
             raise ValueError("forced_initial_observations must be positive")
         if information_floor <= 0.0:
             raise ValueError("information_floor must be positive")
+        if strategy == "certified" and not self._certified_sample_targets:
+            raise RuntimeError(
+                "certified allocation requires frozen planning effect gaps"
+            )
 
         unresolved = [
             task
@@ -317,6 +463,24 @@ class AnytimeFamilywiseRouter:
         ]
         if forced:
             return min(forced, key=lambda task: (len(self._observations[task]), task))
+
+        if strategy == "certified":
+            below_target = [
+                task
+                for task in unresolved
+                if len(self._observations[task])
+                < self._certified_sample_targets[task].scheduled_observations
+            ]
+            if below_target:
+                return min(
+                    below_target,
+                    key=lambda task: (
+                        self._certified_sample_targets[task].scheduled_observations
+                        - len(self._observations[task]),
+                        self._certified_sample_targets[task].scheduled_observations,
+                        task,
+                    ),
+                )
 
         width_squared = self.plan.observation_width**2
 
@@ -342,6 +506,13 @@ class AnytimeFamilywiseRouter:
 
     def decisions(self) -> dict[str, TaskEvidence]:
         return {task: self.evidence(task) for task in self.plan.task_names}
+
+    def certified_sample_targets(self) -> tuple[CertifiedSampleTarget, ...]:
+        return tuple(
+            self._certified_sample_targets[task]
+            for task in self.plan.task_names
+            if task in self._certified_sample_targets
+        )
 
     def accepted_tasks(self) -> tuple[str, ...]:
         return tuple(

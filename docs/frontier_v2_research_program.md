@@ -117,11 +117,48 @@ therefore separates the e-process from sampling. It includes:
   evidence needed for either decision, and samples the proposal predicted to
   resolve next.
 
-The frontier method should add a principled allocation rule with a sample
-complexity statement. The target is a successive-elimination or track-and-stop
-style rule whose total paired-sample requirement scales with task difficulty,
-while retaining the same anytime familywise guarantee. Efficiency is evaluated
-at identical candidate-plus-fallback episode budgets.
+The primary development scheduler now adds a certified betting allocation.
+Before confirmation, each task receives a score-scale planning gap
+\(\Delta_i>0\) derived only
+from development evidence and a task-level resolution-failure budget
+\(\beta_i\), with \(\sum_i\beta_i\leq\beta\). For a standardized paired
+difference \(Z_t\in[-1,1]\), let \(d_i=\Delta_i/r_i\), where \(r_i\) is the
+radius of the symmetric registered score-difference interval. For a fixed
+betting fraction \(f\in(0,1)\) and a conditional standardized mean gap of at
+least \(d\) in either direction, concavity gives the per-observation expected
+log-growth bound
+
+\[
+g_f(d)=\frac{1}{2}\log(1-f^2)
++\frac{d}{2}\log\left(\frac{1+f}{1-f}\right).
+\]
+
+The range of the log increment is
+\(h_f=\log((1+f)/(1-f))\). Conditional Hoeffding--Azuma concentration
+therefore implies, with probability at least \(1-\beta_i\),
+
+\[
+\sum_{t=1}^n\log(1+fZ_t)
+\geq ng_f(d_i)-h_f\sqrt{n\log(1/\beta_i)/2}.
+\]
+
+If the component has frozen mixture weight \(v_f\), its task e-process has
+crossed \(1/\alpha_i\) once the right-hand side reaches
+\(\log(1/(\alpha_i v_f))\). The implementation solves this quadratic in
+\(\sqrt n\) for every frozen betting fraction and uses the smallest integer
+bound \(n_i^*\). The scheduler forces initial coverage and then completes the
+smallest remaining registered quota first. If no per-task cap truncates a
+quota and the global budget is at least \(\sum_i n_i^*\), every task whose
+conditional mean is separated from the margin by at least its planning gap is
+resolved with probability at least \(1-\sum_i\beta_i\). No independence across
+tasks is used.
+
+Planning gaps affect only this cost guarantee. If they are optimistic, the
+familywise false-deployment theorem still holds because acceptance continues
+to use the original e-process and alpha thresholds; the affected task may
+simply remain unresolved. `CertifiedSampleTarget` exposes both the theoretical
+quota and the scheduled quota and marks every cap-truncated target. Efficiency
+is evaluated at identical candidate-plus-fallback episode budgets.
 
 The first transparent reference is now implemented in
 `experiments/familywise_policy_baselines.py`. For task \(i\), it spends the
@@ -309,8 +346,25 @@ Holm accepted 15.2% of positive tasks, the uniform Hoeffding mixture accepted
 23.6%, but they use a distinct independent-sign null and had a 0.0067 empirical
 false-deployment rate in these 300 families. The results establish that the
 active betting heuristic can materially improve utility under a binding budget,
-while the conservative racing baseline exposes the remaining need for a tighter
-principled allocation rule.
+while the conservative racing baseline supplies a transparent reference.
+
+The certified betting schedule produced 18 false-deployment families in a
+separate 10,000-family global-null run: rate 0.0018, Wilson 95% interval
+[0.00114, 0.00284]. The frozen planning gaps were deliberately false in this
+null stress test, illustrating that allocation misspecification does not alter
+the alpha guarantee. In the 300 mixed-effect families, certified allocation
+accepted 38.8% of positive tasks and produced mean equal-task improvement
+0.0522. Relative to uniform allocation, the paired acceptance-rate difference
+was 0.2762 [0.2638, 0.2886] and the paired improvement difference was 0.0334
+[0.0317, 0.0352]. It made no false acceptance in that run.
+
+Those power numbers are promising but do not yet demonstrate the untruncated
+sample-complexity theorem. At the 200-observation per-task cap, 22 of the 23
+mixed-scenario certified quotas are truncated; only the task with planning gap
+0.6 has an untruncated 170-observation quota. The next calibration must compare
+the realized cost with the registered bounds in regimes where the global and
+per-task caps are nonbinding, as well as under deliberately optimistic planning
+gaps.
 
 ## Evidential firewall
 

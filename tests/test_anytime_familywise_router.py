@@ -8,6 +8,8 @@ from experiments.anytime_familywise_router import (
     AnytimeFamilywisePlan,
     AnytimeFamilywiseRouter,
     RouteDecision,
+    betting_component_growth_lower_bound,
+    betting_resolution_sample_bound,
 )
 
 
@@ -130,3 +132,37 @@ def test_invalid_weight_family_is_rejected() -> None:
             task_names=("a", "b"),
             task_weights=(("a", 1.0),),
         )
+
+
+def test_betting_resolution_bound_shrinks_with_effect_gap() -> None:
+    small, _small_fraction = betting_resolution_sample_bound(
+        0.2, alpha=0.01, beta=0.01
+    )
+    large, _large_fraction = betting_resolution_sample_bound(
+        0.6, alpha=0.01, beta=0.01
+    )
+    assert large < small
+    assert betting_component_growth_lower_bound(0.6, 0.2) > 0.0
+
+
+def test_certified_allocation_completes_shortest_frozen_quota_first() -> None:
+    plan = AnytimeFamilywisePlan(
+        task_names=("hard", "easy"),
+        planning_effect_gaps=(("hard", 0.2), ("easy", 0.6)),
+        maximum_observations_per_task=2_000,
+    )
+    router = AnytimeFamilywiseRouter(plan)
+    assert router.next_task(strategy="certified", forced_initial_observations=1) == "easy"
+    router.update("easy", 0.0)
+    assert router.next_task(strategy="certified", forced_initial_observations=1) == "hard"
+    router.update("hard", 0.0)
+    assert router.next_task(strategy="certified", forced_initial_observations=1) == "easy"
+    targets = {target.task: target for target in router.certified_sample_targets()}
+    assert targets["easy"].required_observations < targets["hard"].required_observations
+    assert not targets["easy"].clipped_by_task_cap
+
+
+def test_certified_allocation_requires_planning_gaps() -> None:
+    router = AnytimeFamilywiseRouter(AnytimeFamilywisePlan(task_names=("task",)))
+    with pytest.raises(RuntimeError, match="planning effect gaps"):
+        router.next_task(strategy="certified", forced_initial_observations=1)

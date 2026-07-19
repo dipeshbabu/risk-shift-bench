@@ -12,7 +12,7 @@ import hashlib
 import json
 import random
 from concurrent.futures import ProcessPoolExecutor
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from functools import partial
 from math import sqrt
 from pathlib import Path
@@ -28,6 +28,7 @@ from experiments.anytime_familywise_router import (
 class SyntheticScenario:
     name: str
     task_means: tuple[tuple[str, float], ...]
+    planning_effect_gaps: tuple[tuple[str, float], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -46,6 +47,9 @@ def default_scenarios() -> dict[str, SyntheticScenario]:
     global_null = SyntheticScenario(
         name="global_null",
         task_means=tuple((f"null_{index:02d}", 0.0) for index in range(23)),
+        planning_effect_gaps=tuple(
+            (f"null_{index:02d}", 0.1) for index in range(23)
+        ),
     )
     sparse = SyntheticScenario(
         name="sparse_positive",
@@ -53,6 +57,12 @@ def default_scenarios() -> dict[str, SyntheticScenario]:
             *[(f"null_{index:02d}", 0.0) for index in range(20)],
             ("positive_20", 0.2),
             ("positive_40", 0.4),
+            ("positive_60", 0.6),
+        ),
+        planning_effect_gaps=(
+            *[(f"null_{index:02d}", 0.1) for index in range(20)],
+            ("positive_20", 0.15),
+            ("positive_40", 0.3),
             ("positive_60", 0.6),
         ),
     )
@@ -64,6 +74,14 @@ def default_scenarios() -> dict[str, SyntheticScenario]:
             *[(f"small_positive_{index:02d}", 0.15) for index in range(4)],
             ("medium_positive_00", 0.35),
             ("medium_positive_01", 0.35),
+            ("large_positive_00", 0.6),
+        ),
+        planning_effect_gaps=(
+            *[(f"negative_{index:02d}", 0.35) for index in range(8)],
+            *[(f"null_{index:02d}", 0.1) for index in range(8)],
+            *[(f"small_positive_{index:02d}", 0.1) for index in range(4)],
+            ("medium_positive_00", 0.3),
+            ("medium_positive_01", 0.3),
             ("large_positive_00", 0.6),
         ),
     )
@@ -110,6 +128,9 @@ def run_synthetic_trial(
         effect_margin=effect_margin,
         e_process_method=e_process_method,
         maximum_observations_per_task=maximum_observations_per_task,
+        planning_effect_gaps=(
+            scenario.planning_effect_gaps if strategy == "certified" else ()
+        ),
     )
     router = AnytimeFamilywiseRouter(plan)
     task_rngs = {
@@ -285,7 +306,7 @@ def summarize_trials(
     false_accept_families = sum(result.false_accept for result in results)
     interval = wilson_interval(false_accept_families, trials)
     positive_count = results[0].positive_task_count
-    return {
+    summary = {
         "scope": "Synthetic development calibration; no confirmation artifact is read.",
         "scenario": scenario.name,
         "strategy": strategy,
@@ -331,6 +352,27 @@ def summarize_trials(
         )
         / trials,
     }
+    if strategy == "certified":
+        means = dict(scenario.task_means)
+        plan = AnytimeFamilywisePlan(
+            task_names=tuple(sorted(means)),
+            familywise_alpha=familywise_alpha,
+            futility_familywise_alpha=familywise_alpha,
+            effect_margin=effect_margin,
+            e_process_method=e_process_method,
+            maximum_observations_per_task=maximum_observations_per_task,
+            planning_effect_gaps=scenario.planning_effect_gaps,
+        )
+        target_router = AnytimeFamilywiseRouter(plan)
+        summary["planning_effect_gaps"] = dict(scenario.planning_effect_gaps)
+        summary["certified_sample_targets"] = [
+            asdict(target) for target in target_router.certified_sample_targets()
+        ]
+        summary["certified_targets_clipped_by_task_cap"] = sum(
+            target.clipped_by_task_cap
+            for target in target_router.certified_sample_targets()
+        )
+    return summary
 
 
 def parse_args() -> argparse.Namespace:
@@ -341,7 +383,9 @@ def parse_args() -> argparse.Namespace:
         default="all",
     )
     parser.add_argument(
-        "--strategy", choices=("uniform", "resolution", "both"), default="both"
+        "--strategy",
+        choices=("uniform", "resolution", "certified", "both", "all"),
+        default="both",
     )
     parser.add_argument("--trials", type=int, default=1_000)
     parser.add_argument("--seed", type=int, default=2_026_071_900)
@@ -368,11 +412,12 @@ def main() -> None:
         if args.scenario == "all"
         else [scenarios[args.scenario]]
     )
-    strategies = (
-        ("uniform", "resolution")
-        if args.strategy == "both"
-        else (args.strategy,)
-    )
+    if args.strategy == "both":
+        strategies = ("uniform", "resolution")
+    elif args.strategy == "all":
+        strategies = ("uniform", "resolution", "certified")
+    else:
+        strategies = (args.strategy,)
     methods = (
         ("hoeffding_mixture", "betting_mixture")
         if args.e_process_method == "both"

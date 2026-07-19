@@ -42,6 +42,7 @@ DEFAULT_METHODS = (
     "hoeffding_uniform",
     "betting_uniform",
     "betting_resolution",
+    "betting_certified",
 )
 
 METHOD_ASSUMPTIONS = {
@@ -53,6 +54,7 @@ METHOD_ASSUMPTIONS = {
     "hoeffding_uniform": "bounded anytime conditional-mean null",
     "betting_uniform": "bounded anytime conditional-mean null",
     "betting_resolution": "bounded anytime conditional-mean null",
+    "betting_certified": "bounded anytime conditional-mean null",
 }
 
 

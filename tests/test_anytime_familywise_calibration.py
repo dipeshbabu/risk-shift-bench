@@ -119,3 +119,21 @@ def test_invalid_synthetic_mean_is_rejected() -> None:
             upper=1.0,
             rng=random.Random(0),
         )
+
+
+def test_certified_summary_reports_clipped_and_unclipped_quotas() -> None:
+    scenario = SyntheticScenario(
+        name="planned",
+        task_means=(("hard", 0.2), ("easy", 0.8)),
+        planning_effect_gaps=(("hard", 0.2), ("easy", 0.8)),
+    )
+    summary = summarize_trials(
+        scenario,
+        strategy="certified",
+        trials=1,
+        seed=3,
+        maximum_observations_per_task=200,
+        global_observation_budget=100,
+    )
+    assert len(summary["certified_sample_targets"]) == 2
+    assert summary["certified_targets_clipped_by_task_cap"] >= 1
