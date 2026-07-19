@@ -16,6 +16,10 @@ RUNNER_IMPLEMENTATION_FILES = {
         "experiments/frontier_v2_double_dqn.py",
         "experiments/frontier_v2_ppo.py",
     ),
+    "PPO-Lagrangian": ("experiments/frontier_v2_omnisafe.py",),
+    "constrained policy optimization": (
+        "experiments/frontier_v2_omnisafe.py",
+    ),
 }
 
 

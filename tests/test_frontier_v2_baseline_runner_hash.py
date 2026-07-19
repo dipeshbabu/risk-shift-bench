@@ -20,6 +20,12 @@ def test_double_dqn_runner_file_is_frozen() -> None:
     assert runner_implementation_files("recurrent PPO") == runner_implementation_files(
         "clipped PPO"
     )
+    assert runner_implementation_files("PPO-Lagrangian") == (
+        "experiments/frontier_v2_omnisafe.py",
+    )
+    assert runner_implementation_files("constrained policy optimization") == (
+        "experiments/frontier_v2_omnisafe.py",
+    )
 
 
 def test_runner_hash_is_newline_canonical(tmp_path: Path) -> None:

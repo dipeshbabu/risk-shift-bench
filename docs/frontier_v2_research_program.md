@@ -343,21 +343,21 @@ MiniGrid suites operate on fully observable compact images, while both Safety
 suites use flattened lidar and proprioceptive observations; four domains
 therefore exceed the prespecified 32-coordinate high-dimensional threshold.
 
-A provenance-bound end-to-end rehearsal previously completed for all 36
+A provenance-bound end-to-end rehearsal is current for all 36
 development and all 36 calibration tasks. Each task ran the complete
 three-policy library for one episode and then repeated the run exactly. Each
 split therefore contains 108 episode rows. Both passed task-hash,
 whole-manifest-hash, clean source-commit, dependency-lock, canonical seed-block,
 common-random-number, complete outcome-schema, derived-summary, score-bound,
-deterministic-replay, and runtime-ledger checks. The development and calibration
-runtime sums were 518.04 and 513.55 seconds, respectively. Every artifact is
+deterministic-replay, and runtime-ledger checks. The current development and
+calibration runtime sums are 466.74 and 530.76 seconds, respectively. Every artifact is
 bound to its outcome-implementation digest, so a policy or adapter code change
 makes the artifact fail the current audit. A portability repair now passes the
 exact audited source path to Git's `safe.directory` setting for each read-only
 provenance command. That repair changed the current digest to
-`2c60837f7c36d8b886de5152de206db436a5a5d966b5279587cec121676ee5cf`;
-the earlier rehearsal artifacts are therefore intentionally stale and both
-splits must be rerun before the design can be locked.
+`2c60837f7c36d8b886de5152de206db436a5a5d966b5279587cec121676ee5cf`.
+Both splits were rerun after that repair and now pass under the current digest;
+the older `5ea81a...` artifacts remain intentionally stale.
 The split manifest hashes remained
 `6de94c6456eccff522e9f9f359d589d10280f551a9616920f17746652a1c235e`
 and `da9faca59d0e1a59e8d98e03d99cdd86b698c5ac618b574492e110d71a2475c2`.
