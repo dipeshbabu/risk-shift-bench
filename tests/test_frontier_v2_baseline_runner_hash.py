@@ -14,6 +14,12 @@ def test_double_dqn_runner_file_is_frozen() -> None:
     assert runner_implementation_files("double DQN") == (
         "experiments/frontier_v2_double_dqn.py",
     )
+    assert runner_implementation_files("clipped PPO")[-1] == (
+        "experiments/frontier_v2_ppo.py"
+    )
+    assert runner_implementation_files("recurrent PPO") == runner_implementation_files(
+        "clipped PPO"
+    )
 
 
 def test_runner_hash_is_newline_canonical(tmp_path: Path) -> None:

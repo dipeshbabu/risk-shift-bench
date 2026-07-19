@@ -8,6 +8,14 @@ from pathlib import Path
 
 RUNNER_IMPLEMENTATION_FILES = {
     "double DQN": ("experiments/frontier_v2_double_dqn.py",),
+    "clipped PPO": (
+        "experiments/frontier_v2_double_dqn.py",
+        "experiments/frontier_v2_ppo.py",
+    ),
+    "recurrent PPO": (
+        "experiments/frontier_v2_double_dqn.py",
+        "experiments/frontier_v2_ppo.py",
+    ),
 }
 
 

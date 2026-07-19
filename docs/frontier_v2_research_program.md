@@ -281,6 +281,22 @@ The smoke-selected LavaCrossing checkpoint was also reconstructed in a fresh
 network and reproduced its stored calibration score and cost exactly. Full
 runs apply this replay audit to the selected checkpoint from every seed.
 
+`experiments/frontier_v2_ppo.py` now supplies the remaining inventory and
+MiniGrid PPO execution path, bound to digest
+`c821fc5d438036f2894387ea28f550b97405acf912978550532f901cf29351e5`.
+Inventory uses a frozen 39-coordinate padded state, three independent
+11-category order heads mapped across each stage's physical supply capacity,
+and a clipped PPO objective. MiniGrid uses a 128-state LSTM, ten parallel
+development environments, per-environment GAE, and five-step truncated
+backpropagation. Both use 250 transitions per update, four update epochs, and
+calibration-only checkpoint selection. A 1,000-transition inventory smoke
+scored 0.454 across two calibration episodes per task; recurrent
+DynamicObstacles remained at zero at the same intentionally tiny budget. Both
+selected checkpoints reproduced their score and cost exactly after reload.
+The smoke runtimes show that the inventory reference is locally tractable but
+the five-seed recurrent references should run on stronger recorded hardware;
+this is a compute-planning conclusion, not an outcome-based design change.
+
 `experiments/robust_test_subset_baseline.py` implements a separate
 RPOSST-inspired comparison in the task-composition layer. It greedily selects a
 task subset and uses projected subgradient optimization to fit simplex weights
