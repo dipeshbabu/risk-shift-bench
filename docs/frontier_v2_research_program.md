@@ -266,6 +266,29 @@ best seed is not substituted for the prespecified replicate distribution.
 Deep OR-Gym and MiniGrid references and both five-seed Safety-Gymnasium
 PPO-Lagrangian/CPO references remain incomplete gates.
 
+The six nonlearned references are now executable rather than design-table
+labels. `experiments/frontier_v2_nonlearned_baselines.py`, bound to digest
+`ea3d729815868eac5c431d522fcdb75cc5afff7a8b0d591c81daaa4d8d962eec`,
+ran 100 canonical calibration episodes per task and repeated every trajectory
+exactly. The FrozenLake, CliffWalking, and Taxi tabular oracles solve the exact
+finite-horizon dynamic program for the frozen bounded score, augmenting state
+by time and accumulated penalties. Their equal-task calibration means were
+0.8303, 0.8677, and 0.9613. The online-knapsack reference is explicitly
+nondeployable: it computes the fractional-knapsack upper bound after observing
+the complete realized item sequence; its mean normalized score was 0.5650.
+The inventory reference applies a lead-time Poisson newsvendor critical-ratio
+base-stock rule and scored 0.4756.
+
+The transferred v1 FrozenLake router was reconstructed from the exact archived
+development and calibration aggregates and checked against the archived router
+report. Each v2 task is converted to the v1 feature schema of map size,
+slipperiness, and transition success rate; v2 map density is not substituted
+for the old success-rate coordinate. Without refitting or reading v2 outcomes,
+the router selected the nominal policy on two calibration tasks and the
+hazard-averse policy on two, for an equal-task mean score of 0.8289. All six
+manifests pass source-lock, task-hash, seed-block, score-bound, derived-summary,
+input-hash, and disk-round-trip replay audits.
+
 The pooled-development Double-DQN adapter is now implemented in
 `experiments/frontier_v2_double_dqn.py` and bound to implementation digest
 `9ed99d797067a3bdc1bd556a5167c05cb07456ed6068eaf4111a2e01f22a8816`.
@@ -428,7 +451,10 @@ not determine whether final results are published.
 `experiments/frontier_v2_readiness.py` now enforces these execution gates in a
 single machine-readable audit. It verifies all seven clean source locks, both
 36-task portable rehearsals, all 12 learned baseline manifests and physical
-checkpoint schedules, calibration selection, and selected-checkpoint replay.
+checkpoint schedules, calibration selection, selected-checkpoint replay, and
+all six nonlearned reference manifests. The current audit passes the complete
+6/6 nonlearned gate and 2/12 learned gate; the ten missing learned references
+remain explicit failures.
 It continues to state `confirmation_execution_authorized: false` even after
 all readiness checks pass; preregistration remains a separate required action.
 

@@ -10,6 +10,10 @@ from experiments.frontier_v2_baseline_audit import audit_baseline_manifest
 from experiments.frontier_v2_baseline_design import COMPETITIVE_BASELINES
 from experiments.frontier_v2_baseline_source_audit import audit_baseline_source_suite
 from experiments.frontier_v2_external_design import outcome_implementation_sha256
+from experiments.frontier_v2_nonlearned_baselines import (
+    NONLEARNED_BASELINES,
+    audit_nonlearned_manifest,
+)
 from experiments.frontier_v2_rehearsal_audit import (
     audit_rehearsal_payload,
     audit_split_coverage_payloads,
@@ -43,6 +47,8 @@ def registration_readiness(
     baseline_source_root: Path,
     rehearsal_root: Path,
     baseline_root: Path,
+    v1_development_root: Path = Path("artifacts/external_development_v1"),
+    v1_router_root: Path = Path("artifacts/external_router_lock_v1"),
 ) -> dict:
     checks = []
     missing = []
@@ -127,6 +133,33 @@ def registration_readiness(
         }
     )
 
+    audited_nonlearned = []
+    for baseline in NONLEARNED_BASELINES:
+        manifest = baseline_root / baseline.domain / baseline.name / "manifest.json"
+        if not manifest.is_file():
+            missing.append(f"nonlearned baseline: {baseline.identifier}")
+            continue
+        try:
+            payload = json.loads(manifest.read_text(encoding="utf-8"))
+            audit = audit_nonlearned_manifest(
+                payload,
+                source_root=environment_source_root,
+                v1_development_root=v1_development_root,
+                v1_router_root=v1_router_root,
+            )
+        except (OSError, RuntimeError, ValueError, json.JSONDecodeError) as error:
+            missing.append(f"invalid nonlearned baseline {baseline.identifier}: {error}")
+        else:
+            audited_nonlearned.append(audit)
+    checks.append(
+        {
+            "gate": "nonlearned_competitive_baselines",
+            "passed": len(audited_nonlearned) == len(NONLEARNED_BASELINES),
+            "audited": len(audited_nonlearned),
+            "required": len(NONLEARNED_BASELINES),
+        }
+    )
+
     ready = all(check["passed"] for check in checks) and not missing
     return {
         "design": "riskshiftbench-frontier-v2-registration-readiness-v1",
@@ -134,6 +167,7 @@ def registration_readiness(
         "outcome_implementation_sha256": outcome_implementation_sha256(),
         "checks": checks,
         "learned_baselines": audited_baselines,
+        "nonlearned_baselines": audited_nonlearned,
         "missing_or_invalid": missing,
         "confirmation_execution_authorized": False,
     }
@@ -161,6 +195,16 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=Path("artifacts/frontier_v2_baselines"),
     )
+    parser.add_argument(
+        "--v1-development-root",
+        type=Path,
+        default=Path("artifacts/external_development_v1"),
+    )
+    parser.add_argument(
+        "--v1-router-root",
+        type=Path,
+        default=Path("artifacts/external_router_lock_v1"),
+    )
     parser.add_argument("--output", type=Path)
     return parser.parse_args()
 
@@ -172,6 +216,8 @@ def main() -> None:
         baseline_source_root=args.baseline_source_root,
         rehearsal_root=args.rehearsal_root,
         baseline_root=args.baseline_root,
+        v1_development_root=args.v1_development_root,
+        v1_router_root=args.v1_router_root,
     )
     rendered = json.dumps(payload, indent=2, sort_keys=True) + "\n"
     if args.output:
