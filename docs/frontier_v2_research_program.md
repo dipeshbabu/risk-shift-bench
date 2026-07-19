@@ -216,6 +216,38 @@ racing rule, the Hoeffding-mixture router, and the betting-mixture router. The
 sign methods test an independent sign null rather than the conditional-mean
 null and are labeled separately; they are not interchangeable guarantees.
 
+The learned-policy reference protocol is now machine-readable in
+`experiments/frontier_v2_baseline_design.py`. Every learned baseline uses five
+frozen training seeds, retains checkpoints every 50,000 environment steps, and
+uses development tasks for training and exactly 100 episodes per calibration
+task for checkpoint selection. Non-safe policies maximize equal-task normalized
+score. PPO-Lagrangian and CPO first require equal-task mean episode cost at most
+25, with a prespecified minimum-cost fallback if no checkpoint is feasible.
+The training budgets are 500,000 steps per seed for tabular Q-learning and one
+million for every deep or safe-RL reference.
+
+External implementations are pinned to OmniSafe commit
+`15603dd7a654a991d0a4648216b69d60b81a6366`, MiniGrid's recommended
+`rl-starter-files` commit
+`317da04a9a6fb26506bbd7f6c7c7e10fc0de86e0`, and CleanRL commit
+`fe8d8a03c41a7ef5b523e2e354bd01c363e786bb`. The current competitive-baseline
+design hash is
+`60cde38aa5210406d74f5692bcb50cca9c25a5b45c0b2034db1f02bbd2f84d95`,
+and the internal trainer implementation hash is
+`0900d4fd795d3ae354bd04d7ed4a09c0798444a923c6d1e0daa6f98f510f027e`.
+These remain development hashes until the complete baseline suite is locked.
+
+The five-seed, 500,000-step tabular Q-learning references are complete for
+CliffWalking and Taxi. `experiments/frontier_v2_baseline_audit.py` verified all
+100 physical checkpoint files, their SHA-256 hashes, complete schedules, source
+and design locks, and the mechanical selection rule. CliffWalking selected
+calibration scores ranged from 0.3770 to 0.7876 across seeds, with selected
+steps from 300,000 to 450,000. Taxi scores ranged from 0.9611 to 0.9615, with
+selected steps from 200,000 to 500,000. All five seeds will be reported; the
+best seed is not substituted for the prespecified replicate distribution.
+Deep OR-Gym and MiniGrid references and both five-seed Safety-Gymnasium
+PPO-Lagrangian/CPO references remain incomplete gates.
+
 `experiments/robust_test_subset_baseline.py` implements a separate
 RPOSST-inspired comparison in the task-composition layer. It greedily selects a
 task subset and uses projected subgradient optimization to fit simplex weights
