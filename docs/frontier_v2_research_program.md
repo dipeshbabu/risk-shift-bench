@@ -237,6 +237,24 @@ and the internal trainer implementation hash is
 `0900d4fd795d3ae354bd04d7ed4a09c0798444a923c6d1e0daa6f98f510f027e`.
 These remain development hashes until the complete baseline suite is locked.
 
+`experiments/frontier_v2_baseline_source_audit.py` now verifies all three
+physical checkouts, exact commits, clean working trees, declared license text,
+and the algorithm entry points before a baseline can be treated as ready. The
+audited implementation hashes are `74dafd200ed8494b2653c32882d659369d58414e7d4987da774716eb2d7a3670`
+for OmniSafe PPO-Lagrangian,
+`38e6417b1ebe3b3e87923c6a6af3b59218844035ebab895efb43159ae55a8783`
+for OmniSafe CPO,
+`f49a075ca2dc722f101486da3186065cea810ddf7ba04c1451edd358e06eedcd`
+for the MiniGrid PPO training entry point,
+`b61592b8cf909a8a88081498daedf111b2abdd33affc6c51bd71c6fe6632b26e`
+for its recurrent actor-critic model, and
+`a0ea7da3c80d56c0701d3d36348887c7d5c04b8a2ab799d2a421458f809f8743`
+and `6f4c04e3349f5b6a1ebbd29775416da80344f8cb5b6368952017d8898bc1ebe8`
+for CleanRL DQN and PPO. CleanRL's pinned file implements ordinary DQN; the
+prespecified Double-DQN reference therefore requires a repository-local,
+hashed target-selection adaptation and must not be described as an unchanged
+upstream run.
+
 The five-seed, 500,000-step tabular Q-learning references are complete for
 CliffWalking and Taxi. `experiments/frontier_v2_baseline_audit.py` verified all
 100 physical checkpoint files, their SHA-256 hashes, complete schedules, source
