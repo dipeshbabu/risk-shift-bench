@@ -450,11 +450,13 @@ not determine whether final results are published.
 
 `experiments/frontier_v2_readiness.py` now enforces these execution gates in a
 single machine-readable audit. It verifies all seven clean source locks, both
-36-task portable rehearsals, all 12 learned baseline manifests and physical
-checkpoint schedules, calibration selection, selected-checkpoint replay, and
-all six nonlearned reference manifests. The current audit passes the complete
-6/6 nonlearned gate and 2/12 learned gate; the ten missing learned references
-remain explicit failures.
+36-task portable rehearsals, separate 20-episode-per-policy development and
+calibration suites with exact replay, all 12 learned baseline manifests and
+physical checkpoint schedules, calibration selection, selected-checkpoint
+replay, and all six nonlearned reference manifests. The current audit passes
+the complete 6/6 nonlearned gate and 2/12 learned gate; the two sized suites and
+ten missing learned references remain explicit failures until their audited
+jobs complete.
 It continues to state `confirmation_execution_authorized: false` even after
 all readiness checks pass; preregistration remains a separate required action.
 

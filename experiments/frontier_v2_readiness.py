@@ -26,7 +26,12 @@ LEARNED_BASELINES = tuple(
 )
 
 
-def _audit_rehearsal_directory(path: Path, split: str) -> dict:
+def _audit_rehearsal_directory(
+    path: Path,
+    split: str,
+    *,
+    expected_episodes_per_policy: int,
+) -> dict:
     if not path.is_dir():
         raise RuntimeError(f"rehearsal directory is missing: {path}")
     payloads = []
@@ -37,7 +42,7 @@ def _audit_rehearsal_directory(path: Path, split: str) -> dict:
     return audit_split_coverage_payloads(
         payloads,
         split=split,
-        expected_episodes_per_policy=1,
+        expected_episodes_per_policy=expected_episodes_per_policy,
     )
 
 
@@ -76,7 +81,11 @@ def registration_readiness(
     }
     for split, directory in rehearsal_directories.items():
         try:
-            audit = _audit_rehearsal_directory(directory, split)
+            audit = _audit_rehearsal_directory(
+                directory,
+                split,
+                expected_episodes_per_policy=1,
+            )
         except (OSError, RuntimeError, ValueError, json.JSONDecodeError) as error:
             missing.append(f"{split} rehearsal: {error}")
             checks.append({"gate": f"{split}_rehearsal", "passed": False})
@@ -87,6 +96,34 @@ def registration_readiness(
                     "passed": True,
                     "task_count": audit["task_count"],
                     "row_count": audit["total_episode_rows"],
+                    "outcome_implementation_sha256": audit[
+                        "outcome_implementation_sha256"
+                    ],
+                }
+            )
+
+    sized_rehearsal_directories = {
+        "development": rehearsal_root / "development_portable_20ep",
+        "calibration": rehearsal_root / "calibration_portable_20ep",
+    }
+    for split, directory in sized_rehearsal_directories.items():
+        try:
+            audit = _audit_rehearsal_directory(
+                directory,
+                split,
+                expected_episodes_per_policy=20,
+            )
+        except (OSError, RuntimeError, ValueError, json.JSONDecodeError) as error:
+            missing.append(f"sized {split} suite: {error}")
+            checks.append({"gate": f"sized_{split}_suite", "passed": False})
+        else:
+            checks.append(
+                {
+                    "gate": f"sized_{split}_suite",
+                    "passed": True,
+                    "task_count": audit["task_count"],
+                    "row_count": audit["total_episode_rows"],
+                    "episodes_per_policy": 20,
                     "outcome_implementation_sha256": audit[
                         "outcome_implementation_sha256"
                     ],
