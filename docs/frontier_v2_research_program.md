@@ -262,15 +262,22 @@ MiniGrid suites operate on fully observable compact images, while both Safety
 suites use flattened lidar and proprioceptive observations; four domains
 therefore exceed the prespecified 32-coordinate high-dimensional threshold.
 
-A development-only end-to-end smoke run has completed for all nine domains.
-`experiments/frontier_v2_rehearsal_audit.py` verified complete policy libraries,
-common-random-number seed alignment, schema consistency, bounded scores, and
-the absence of confirmation tasks. This is adapter feasibility evidence, not a
-claim that the policy libraries are competitive or that every task is ready.
-Full development and calibration coverage, seed determinism reruns, score-bound
-stress tests, runtime accounting, and trained DQN/PPO/safe-RL references remain
-gates before registration. The execution adapter unconditionally refuses every
-confirmation task.
+A provenance-bound, development-only end-to-end rehearsal has now completed
+for all 36 development tasks. Each task ran the complete three-policy library
+for one episode and then repeated the run exactly. The resulting 108 episode
+rows passed task-hash, whole-manifest-hash, clean source-commit, dependency-lock,
+canonical seed-block, common-random-number, score-bound, deterministic-replay,
+and runtime-ledger checks. Recorded simulator time was 488.98 seconds. The
+development manifest hash remained
+`6de94c6456eccff522e9f9f359d589d10280f551a9616920f17746652a1c235e`.
+
+This is full adapter coverage, not a statistically informative policy
+comparison and not evidence that the scripted policy libraries are competitive.
+`experiments/frontier_v2_full_rehearsal.py` will declare a split complete only
+after all 36 exact task artifacts pass the strict audit and unconditionally
+refuses confirmation. Statistically sized development and calibration runs,
+score-bound stress tests beyond observed trajectories, and trained
+DQN/PPO/safe-RL references remain gates before registration.
 
 The current machine has six CPU cores, 15.8 GB RAM, and a 4 GB GTX 1650, so
 scripted-policy development can run locally, but training or evaluating the

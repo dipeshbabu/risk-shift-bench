@@ -12,6 +12,7 @@ import importlib.metadata
 import math
 import sys
 from dataclasses import asdict, dataclass
+from functools import lru_cache
 from pathlib import Path
 from statistics import fmean
 
@@ -19,6 +20,7 @@ from experiments.frontier_v2_external_design import (
     CODEBASE_LOCKS,
     DOMAIN_SPECS,
     V2ExternalTask,
+    expected_episode_seeds,
 )
 from experiments.frontier_v2_source_audit import SOURCE_DIRECTORIES, audit_codebase_source
 
@@ -77,6 +79,7 @@ def assert_development_execution(task: V2ExternalTask) -> None:
         )
 
 
+@lru_cache(maxsize=len(CODEBASE_LOCKS))
 def _activate_verified_source(source: Path, codebase: str) -> None:
     lock = CODEBASE_LOCKS[codebase]
     audit_codebase_source(source, codebase)
@@ -301,8 +304,10 @@ def run_gymnasium_task(
     )
     rows = []
     try:
-        for episode in range(episodes):
-            seed = seed_base + episode
+        seeds = expected_episode_seeds(
+            task, episodes=episodes, seed_base=seed_base
+        )
+        for episode, seed in enumerate(seeds):
             observation, _info = environment.reset(seed=seed)
             raw_return = 0.0
             steps = 0
@@ -474,8 +479,10 @@ def run_minigrid_task(
     environment = FullyObsWrapper(gym.make(task.environment_id, **kwargs))
     rows = []
     try:
-        for episode in range(episodes):
-            seed = int(parameters["layout_seed_base"]) + seed_base + episode
+        seeds = expected_episode_seeds(
+            task, episodes=episodes, seed_base=seed_base
+        )
+        for episode, seed in enumerate(seeds):
             observation, _info = environment.reset(seed=seed)
             image = observation["image"]
             if image.size < DOMAIN_SPECS[task.domain].minimum_observation_coordinates:
@@ -591,8 +598,10 @@ def run_or_gym_task(
         fractional_upper_bound = capacity * max(
             value / weight for weight, value in zip(weights, values, strict=True)
         )
-        for episode in range(episodes):
-            seed = seed_base + episode
+        seeds = expected_episode_seeds(
+            task, episodes=episodes, seed_base=seed_base
+        )
+        for episode, seed in enumerate(seeds):
             np.random.seed(seed)
             environment = OnlineKnapsackEnv()
             environment.max_weight = capacity
@@ -658,8 +667,10 @@ def run_or_gym_task(
         lead_times = [
             max(1, round(base * lead_time_scale)) for base in (3, 5, 10)
         ]
-        for episode in range(episodes):
-            seed = int(parameters["demand_seed"]) + seed_base + episode
+        seeds = expected_episode_seeds(
+            task, episodes=episodes, seed_base=seed_base
+        )
+        for episode, seed in enumerate(seeds):
             np.random.seed(seed)
             environment = environment_class(
                 periods=int(parameters["periods"]),
@@ -782,8 +793,10 @@ def run_safety_gymnasium_task(
     rows = []
     environment = safety_gymnasium.make(task.environment_id)
     try:
-        for episode in range(episodes):
-            seed = int(parameters["layout_seed_base"]) + seed_base + episode
+        seeds = expected_episode_seeds(
+            task, episodes=episodes, seed_base=seed_base
+        )
+        for episode, seed in enumerate(seeds):
             observation, _info = environment.reset(seed=seed)
             raw_return = 0.0
             total_cost = 0.0

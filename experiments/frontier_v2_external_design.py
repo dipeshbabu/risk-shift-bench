@@ -248,6 +248,16 @@ DOMAIN_SPECS = {
 
 DOMAINS = tuple(DOMAIN_SPECS)
 
+STREAM_SEED_BASES = {
+    ("development", "evaluation"): 10_000_000,
+    ("calibration", "evaluation"): 20_000_000,
+    ("confirmation", "pilot"): 30_000_000,
+    ("confirmation", "final"): 40_000_000,
+}
+DOMAIN_SEED_STRIDE = 100_000
+TASK_SEED_STRIDE = 10_000
+MAX_EPISODES_PER_TASK_STREAM = TASK_SEED_STRIDE
+
 
 def canonical_sha256(value: object) -> str:
     encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -527,8 +537,58 @@ def all_tasks(split: str) -> list[V2ExternalTask]:
     return [task for domain in DOMAINS for task in domain_tasks(domain, split)]
 
 
+def task_sha256(task: V2ExternalTask) -> str:
+    return canonical_sha256(asdict(task))
+
+
 def task_manifest_sha256(tasks: list[V2ExternalTask]) -> str:
     return canonical_sha256([asdict(task) for task in tasks])
+
+
+def canonical_episode_seed_base(
+    task: V2ExternalTask,
+    *,
+    stream: str | None = None,
+) -> int:
+    """Return the frozen nonoverlapping seed block for a task and data stream."""
+
+    if stream is None:
+        if task.split == "confirmation":
+            raise ValueError("confirmation seeds require an explicit pilot or final stream")
+        stream = "evaluation"
+    try:
+        base = STREAM_SEED_BASES[(task.split, stream)]
+    except KeyError as error:
+        raise ValueError(f"invalid stream {stream!r} for split {task.split!r}") from error
+    try:
+        domain_index = DOMAINS.index(task.domain)
+        task_index = next(
+            index
+            for index, expected in enumerate(domain_tasks(task.domain, task.split))
+            if expected == task
+        )
+    except (ValueError, StopIteration) as error:
+        raise ValueError("task is not an exact member of the frozen v2 manifest") from error
+    return base + domain_index * DOMAIN_SEED_STRIDE + task_index * TASK_SEED_STRIDE
+
+
+def expected_episode_seeds(
+    task: V2ExternalTask,
+    *,
+    episodes: int,
+    seed_base: int,
+) -> tuple[int, ...]:
+    """Mirror the adapter seed transformation for an auditable CRN schedule."""
+
+    if not 0 < episodes <= MAX_EPISODES_PER_TASK_STREAM:
+        raise ValueError(
+            "episodes must be positive and fit inside the frozen task seed block"
+        )
+    parameters = task.parameter_dict()
+    task_offset = int(
+        parameters.get("layout_seed_base", parameters.get("demand_seed", 0))
+    )
+    return tuple(task_offset + seed_base + episode for episode in range(episodes))
 
 
 def validate_design() -> None:
@@ -574,6 +634,24 @@ def validate_design() -> None:
                     raise ValueError(f"task reused across splits: {task.name}")
                 signatures_by_domain[domain].add(signature)
 
+    seed_blocks = []
+    for (split, stream), _base in STREAM_SEED_BASES.items():
+        for task in all_tasks(split):
+            start = expected_episode_seeds(
+                task,
+                episodes=1,
+                seed_base=canonical_episode_seed_base(task, stream=stream),
+            )[0]
+            seed_blocks.append(
+                (start, start + MAX_EPISODES_PER_TASK_STREAM - 1, task.name, stream)
+            )
+    seed_blocks.sort()
+    for left, right in zip(seed_blocks, seed_blocks[1:], strict=False):
+        if left[1] >= right[0]:
+            raise ValueError(
+                f"canonical episode seed blocks overlap: {left[2:]} and {right[2:]}"
+            )
+
 
 def design_summary() -> dict:
     validate_design()
@@ -594,6 +672,17 @@ def design_summary() -> dict:
             spec.minimum_observation_coordinates >= 32
             for spec in DOMAIN_SPECS.values()
         ),
+        "seed_protocol": {
+            "stream_bases": [
+                {"split": split, "stream": stream, "base": base}
+                for (split, stream), base in STREAM_SEED_BASES.items()
+            ],
+            "domain_stride": DOMAIN_SEED_STRIDE,
+            "task_stride": TASK_SEED_STRIDE,
+            "maximum_episodes_per_task_stream": MAX_EPISODES_PER_TASK_STREAM,
+            "pairing": "common random numbers within task across policies",
+            "all_task_stream_blocks_disjoint": True,
+        },
         "splits": {
             split: {
                 "task_count": len(all_tasks(split)),

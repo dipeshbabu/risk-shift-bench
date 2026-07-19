@@ -10,8 +10,10 @@ from experiments.frontier_v2_external_design import (
     DOMAIN_SPECS,
     SPLITS,
     all_tasks,
+    canonical_episode_seed_base,
     design_summary,
     domain_tasks,
+    expected_episode_seeds,
     task_manifest_sha256,
     validate_design,
 )
@@ -63,6 +65,7 @@ def test_design_summary_contains_no_outcomes_or_execution_authority() -> None:
     assert "outcomes" not in summary
     assert summary["splits"]["confirmation"]["task_count"] == 36
     assert set(summary["domains"]) == set(DOMAINS)
+    assert summary["seed_protocol"]["all_task_stream_blocks_disjoint"] is True
 
 
 def test_serialized_tasks_do_not_hide_mutable_parameters() -> None:
@@ -77,3 +80,27 @@ def test_unknown_domain_or_split_is_rejected() -> None:
         domain_tasks("not_a_domain", "development")
     with pytest.raises(KeyError):
         domain_tasks(DOMAINS[0], "not_a_split")
+
+
+def test_canonical_episode_seed_blocks_are_disjoint() -> None:
+    observed = set()
+    for split, streams in (
+        ("development", ("evaluation",)),
+        ("calibration", ("evaluation",)),
+        ("confirmation", ("pilot", "final")),
+    ):
+        for stream in streams:
+            for task in all_tasks(split):
+                base = canonical_episode_seed_base(task, stream=stream)
+                seeds = expected_episode_seeds(task, episodes=100, seed_base=base)
+                assert observed.isdisjoint(seeds)
+                observed.update(seeds)
+
+
+def test_confirmation_seed_stream_must_be_explicit() -> None:
+    task = all_tasks("confirmation")[0]
+    with pytest.raises(ValueError, match="explicit"):
+        canonical_episode_seed_base(task)
+    assert canonical_episode_seed_base(task, stream="pilot") != (
+        canonical_episode_seed_base(task, stream="final")
+    )
