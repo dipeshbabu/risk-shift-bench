@@ -7,7 +7,11 @@ __pycache__/
 .ruff_cache/
 
 # Generated research outputs
-artifacts/
+artifacts/*
+!artifacts/external_development_v1/
+!artifacts/external_development_v1/**
+!artifacts/external_router_lock_v1/
+!artifacts/external_router_lock_v1/**
 data/raw/
 data/interim/
 data/processed/

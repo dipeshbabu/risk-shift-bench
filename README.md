@@ -209,8 +209,10 @@ candidate-everywhere, fit-only, pilot-verified, and multiplicity-adjusted
 deployment rules; builds an all-subset pilot-budget curve; samples promotions
 matched to the accepted counts; and evaluates 81 score-weight combinations.
 These checks use opened final outcomes and are not additional confirmatory
-tests. The draft for a future externally registered extension is
+tests. The protocol for the independent external extension is
 [`docs/preregistration_external_domains_v1.md`](docs/preregistration_external_domains_v1.md).
+It is publicly registered at [OSF](https://doi.org/10.17605/OSF.IO/C576U), and
+confirmation commands require the finalized registered wrapper.
 
 Run the second environment family:
 

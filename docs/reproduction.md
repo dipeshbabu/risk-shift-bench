@@ -70,15 +70,25 @@ These values are post-confirmation because they use the opened final task
 effects. The count-matched random percentile is not a primary p-value, and the
 score grid was not part of the local confirmation lock.
 
-## Draft external extension
+## Registered external extension
 
 [`preregistration_external_domains_v1.md`](preregistration_external_domains_v1.md)
-and
-[`../configs/external_domain_extension_preregistration_draft_v1.json`](../configs/external_domain_extension_preregistration_draft_v1.json)
-define the next study as a draft. They are not an external registration. Do
-not run an external confirmation episode until the final protocol contains an
-immutable registration URL, timestamp, environment commits, checkpoint hashes,
-and frozen analysis rules.
+documents the independent external study, publicly registered at
+[doi:10.17605/OSF.IO/C576U](https://doi.org/10.17605/OSF.IO/C576U). Its exact locked-design file is
+[`../configs/external_confirmation_locked_design_v1.json`](../configs/external_confirmation_locked_design_v1.json),
+and the earlier planning JSON is retained only as a superseded record. Validate
+the registered lock with:
+
+```powershell
+uv run python -m experiments.external_confirmation_evaluation `
+  --protocol configs/external_confirmation_protocol_v1.registered.json `
+  dry-run
+```
+
+The command must report valid hashes and
+`confirmation_execution_allowed=true`. Every pilot, gate-locking, final, and
+combine command must use the registered wrapper and follow the order listed in
+the protocol document.
 
 ## Pre-confirmation Blackjack score caches
 
