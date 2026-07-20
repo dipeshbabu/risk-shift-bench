@@ -27,12 +27,14 @@ from experiments.frontier_v2_statistical_readiness import (
     PRIMARY_NULL_FILE,
 )
 from experiments.frontier_v2_resolution_bound_check import RESOLUTION_BOUND_FILE
+from experiments.frontier_v2_proof_certificate import PROOF_CERTIFICATE_FILE
 
 
 LOCKED_PROTOCOL_FILES = (
     "experiments/frontier_v2_router_lock.py",
     "experiments/frontier_v2_confirmation_runtime.py",
     "experiments/frontier_v2_competitive_evaluation.py",
+    "experiments/frontier_v2_proof_certificate.py",
     "experiments/frontier_v2_protocol_lock.py",
     "experiments/frontier_v2_readiness.py",
 )
@@ -120,6 +122,7 @@ def build_locked_design(
             PREDICTABLE_NULL_FILE,
             METHOD_COMPARISON_FILE,
             RESOLUTION_BOUND_FILE,
+            PROOF_CERTIFICATE_FILE,
         )
     ]
     return {

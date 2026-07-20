@@ -18,6 +18,10 @@ from experiments.frontier_v2_resolution_bound_check import (
     RESOLUTION_BOUND_FILE,
     audit_resolution_bound_check,
 )
+from experiments.frontier_v2_proof_certificate import (
+    PROOF_CERTIFICATE_FILE,
+    audit_proof_certificate,
+)
 
 
 PRIMARY_NULL_FILE = "global_null_betting_certified_10000_current.json"
@@ -151,6 +155,9 @@ def audit_statistical_readiness(root: Path) -> dict:
     resolution_bound = json.loads(
         (root / RESOLUTION_BOUND_FILE).read_text(encoding="utf-8")
     )
+    proof_certificate = json.loads(
+        (root / PROOF_CERTIFICATE_FILE).read_text(encoding="utf-8")
+    )
     return {
         "statistical_implementation_sha256": statistical_implementation_sha256(),
         "primary_null": _audit_null_payload(
@@ -168,4 +175,5 @@ def audit_statistical_readiness(root: Path) -> dict:
         "nonbinding_resolution_bound": audit_resolution_bound_check(
             resolution_bound
         ),
+        "proof_certificate": audit_proof_certificate(proof_certificate),
     }
