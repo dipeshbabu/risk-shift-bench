@@ -210,6 +210,32 @@ deliberately conservative, but it supplies an implementation-checkable
 familywise proof and a concrete gap-dependent cost statement against which
 the betting allocation can be judged.
 
+## External proposal lock
+
+`experiments/frontier_v2_router_lock.py` deterministically converts only the
+complete 20-episode development and calibration suites into the external
+confirmation plan. For each domain, the candidate with the largest equal-task
+paired mean development effect is selected; exact ties follow the frozen
+candidate order. All four confirmation tasks in every domain remain in the
+family, so weak or negative development evidence cannot silently remove a
+domain from the breadth claim.
+
+The corresponding calibration task at the same within-domain index supplies
+an allocation-only planning gap. Its absolute paired mean effect is clipped to
+[0.05, 0.50]. A wrong gap can make the scheduler inefficient, but it cannot
+change an e-process or an acceptance threshold. The 36 proposals receive equal
+weights, familywise acceptance and futility budgets of 0.05, a zero deployment
+margin, two forced initial observations, a 200-observation task cap, and the
+certified betting allocation.
+
+The shared primary pilot cap is 3,960 paired observations, or 7,920
+candidate-plus-fallback policy episodes. This exactly matches the v1
+proposal-focused pilot episode budget while covering the larger nine-domain
+family. Every pilot comparator receives the same paired budget and the same
+task-indexed latent episode streams. The readiness audit reconstructs the lock
+from all 72 input artifacts and requires byte-equivalent content before a v2
+registration can be created; it still never authorizes confirmation execution.
+
 ## Required baselines
 
 Every comparison must receive the same pilot episode budget and the same
