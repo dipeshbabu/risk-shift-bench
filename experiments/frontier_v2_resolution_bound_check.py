@@ -77,7 +77,6 @@ def required_targets(
 
 def run_trial(
     scenario: tuple[tuple[str, float, float], ...],
-    *,
     seed: int,
 ) -> dict:
     targets = required_targets(scenario)
