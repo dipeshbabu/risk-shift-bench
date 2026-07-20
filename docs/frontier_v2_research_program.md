@@ -607,13 +607,25 @@ false-deployment-family rate in this small non-null diagnostic. Fixed betting
 therefore remains primary, and predictable betting remains a prespecified
 comparator rather than a data-selected replacement.
 
-Those power numbers are promising but do not yet demonstrate the untruncated
-sample-complexity theorem. At the 200-observation per-task cap, 22 of the 23
-mixed-scenario certified quotas are truncated; only the task with planning gap
-0.6 has an untruncated 170-observation quota. The next calibration must compare
-the realized cost with the registered bounds in regimes where the global and
-per-task caps are nonbinding, as well as under deliberately optimistic planning
-gaps.
+The binding-budget power diagnostic does not by itself exercise the
+untruncated sample-complexity statement: at its 200-observation task cap, 22 of
+23 mixed-scenario quotas are clipped. A separate current-hash check therefore
+used 23 two-point tasks separated from the deployment margin by their exact
+planning gaps, an untruncated maximum task quota of 5,127, and the full summed
+quota budget of 66,810. All 1,000 families respected that deterministic budget.
+Three contained an unresolved task and none resolved in the wrong direction,
+for combined failure 0.003 with Wilson 95% interval [0.00102, 0.00878]. Mean
+realized cost was 18,554 paired observations. This checks the implemented
+gap-dependent bound in a nonbinding regime; the mathematical argument, rather
+than the simulation rate, remains the guarantee.
+
+The current proof certificate separately checks all seven positive endpoint
+betting factors, mixture weights summing to one, 36 task-level alpha weights
+summing to 0.05, and exhaustive stopped null expectations through horizon
+eight. Fixed betting enumerated 510 paths with maximum expected stopped
+acceptance e-value 1.0; predictable betting enumerated the same paths with
+maximum 1.0 up to floating-point precision. The certificate is bound to the
+same statistical implementation digest as the null and power artifacts.
 
 ## Evidential firewall
 
