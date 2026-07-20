@@ -569,12 +569,14 @@ all readiness checks pass; preregistration remains a separate required action.
 These numbers are implementation diagnostics, not confirmation results. With
 23 bounded synthetic tasks, familywise alpha 0.05, a maximum of 200
 observations per task, and a shared budget of 1,150 observations, the completed
-10,000-family global-null gate produced 37 false-deployment families under
-uniform allocation: rate 0.0037, Wilson 95% interval [0.00269, 0.00510]. The
-resolution allocation produced 54: rate 0.0054, interval [0.00414, 0.00704].
-Both interval upper bounds are below 0.01 and far below the 0.05 familywise
-target. This checks the implementation under adaptive interleaving; the theorem,
-not simulation, supplies the validity claim.
+current-hash 10,000-family global-null gate produced 52 false-deployment
+families for primary certified betting: rate 0.0052, Wilson 95% interval
+[0.00397, 0.00681]. In separate 10,000-family runs, the predictable plug-in
+mixture produced 171 false-deployment families under both uniform and
+resolution allocation: rate 0.0171, interval [0.01474, 0.01983]. Every upper
+bound is below the registered 0.05 target. This checks the implementation under
+adaptive interleaving; the theorem, not simulation, supplies the validity
+claim.
 
 In 300 paired-stream mixed-effect families at the same budget, uniform betting
 accepted 11.1% of truly positive tasks and produced mean equal-task expected
@@ -592,15 +594,18 @@ false-deployment rate in these 300 families. The results establish that the
 active betting heuristic can materially improve utility under a binding budget,
 while the conservative racing baseline supplies a transparent reference.
 
-The certified betting schedule produced 18 false-deployment families in a
-separate 10,000-family global-null run: rate 0.0018, Wilson 95% interval
-[0.00114, 0.00284]. The frozen planning gaps were deliberately false in this
-null stress test, illustrating that allocation misspecification does not alter
-the alpha guarantee. In the 300 mixed-effect families, certified allocation
+The frozen planning gaps were deliberately false in the primary null stress
+test, illustrating that allocation misspecification does not alter the alpha
+guarantee. In the current-hash 300 mixed-effect families, certified allocation
 accepted 38.8% of positive tasks and produced mean equal-task improvement
 0.0522. Relative to uniform allocation, the paired acceptance-rate difference
 was 0.2762 [0.2638, 0.2886] and the paired improvement difference was 0.0334
-[0.0317, 0.0352]. It made no false acceptance in that run.
+[0.0317, 0.0352]. It made no false acceptance in that run. Predictable
+resolution accepted 25.5% of positive tasks with improvement 0.0344, while
+predictable uniform accepted 13.7% with improvement 0.0221; each had a 0.0133
+false-deployment-family rate in this small non-null diagnostic. Fixed betting
+therefore remains primary, and predictable betting remains a prespecified
+comparator rather than a data-selected replacement.
 
 Those power numbers are promising but do not yet demonstrate the untruncated
 sample-complexity theorem. At the 200-observation per-task cap, 22 of the 23
