@@ -236,6 +236,32 @@ task-indexed latent episode streams. The readiness audit reconstructs the lock
 from all 72 input artifacts and requires byte-equivalent content before a v2
 registration can be created; it still never authorizes confirmation execution.
 
+`experiments/frontier_v2_protocol_lock.py` then refuses to create a registration
+draft until the source, statistical, rehearsal, router, 12 learned-baseline, and
+six nonlearned-baseline gates all pass. The draft hashes the complete design,
+the router lock, every baseline manifest, the current statistical artifacts,
+and the protocol-specific source. A second wrapper can be finalized only with
+an immutable HTTPS registration URL and timezone-aware registration time.
+
+`experiments/frontier_v2_confirmation_runtime.py` remains inert without that
+finalized wrapper. Its pilot log is append-only and hash-chained. On every
+request, both the parent and the isolated codebase worker replay the complete
+log, reconstruct the e-processes, and require the request to equal the unique
+next task, policy pair, and canonical seed under the registered scheduler. A
+crash can therefore repeat the same deterministic pair but cannot skip ahead
+or silently change allocation. Persistent workers use the separately pinned
+Python environments for Gymnasium, OR-Gym, Safety-Gymnasium, and MiniGrid.
+
+The final stream is blocked until the pilot terminates and its decision file
+exactly matches the authenticated log. It evaluates the frozen candidate and
+fallback on 100 common-random-number episodes per task using seed blocks
+disjoint from the pilot. The deterministic primary analysis reports the
+equal-domain route effect, fixed-domain task bootstrap, domain-resampling
+bootstrap, one-sided task sign-flip test, candidate-everywhere effect, harmful
+accepted routes, per-domain effects, and leave-one-domain-out effects. All
+outcome and analysis files are write-once and checked against frozen hashes on
+resume.
+
 ## Required baselines
 
 Every comparison must receive the same pilot episode budget and the same
