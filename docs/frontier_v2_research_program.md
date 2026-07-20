@@ -116,6 +116,18 @@ construction:
 - [Estimating Means of Bounded Random Variables by Betting](https://arxiv.org/abs/2010.09686)
 - [Familywise Error Rate Control by Interactive Unmasking](https://proceedings.mlr.press/v119/duan20d.html)
 
+Every synthetic calibration and paired method-comparison artifact is now bound
+to the newline-canonicalized statistical implementation digest
+`9c71d848c92cc2a7b12103fed3881cdc7bd5d02d27b60b0593e4e45b109d4192`.
+The digest covers the router, calibration generator, valid comparison methods,
+paired comparison runner, and the hash definition itself. The readiness audit
+requires current-digest artifacts for at least 10,000 primary global-null
+families, 10,000 predictable-comparator global-null families under both
+allocations, and a 300-trial comparison covering every declared method. Null
+calibration is considered adequate only when the Wilson 95% upper bound remains
+at or below 0.05. No observed power or utility threshold is used to select a
+winner.
+
 ## Adaptive pilot allocation
 
 Validity must not depend on the allocation heuristic. The first implementation
@@ -329,6 +341,19 @@ The smoke runtimes show that the inventory reference is locally tractable but
 the five-seed recurrent references should run on stronger recorded hardware;
 this is a compute-planning conclusion, not an outcome-based design change.
 
+`experiments/frontier_v2_omnisafe.py` implements the pooled PointGoal and
+PointButton PPO-Lagrangian/CPO references and is bound to runner digest
+`88b7c87a59c2cd6056dc3931dd8cb4c0d65a535463fc21bb921eb41c38e850dc`.
+An initial four-world wrapper failed after 13,500 steps because MuJoCo had to
+allocate a new model while four task worlds remained resident. The repaired
+wrapper preserves the frozen episode-level round robin and seeds but keeps only
+one world alive, closes and collects it before a task switch, and closes the
+training wrapper before checkpoint evaluation. A real PointGoal
+PPO-Lagrangian smoke then completed 50,000 steps, wrote checkpoint SHA-256
+`98405fa0c1093c90a15cca8609ecb2c90d698a4bf910ceeb59b29394c60d7594`,
+and reproduced its calibration mean score 0.3585 and mean cost 9.75 exactly
+after reload. This validates the execution path; it is not a full-seed result.
+
 `experiments/robust_test_subset_baseline.py` implements a separate
 RPOSST-inspired comparison in the task-composition layer. It greedily selects a
 task subset and uses projected subgradient optimization to fit simplex weights
@@ -388,8 +413,12 @@ makes the artifact fail the current audit. A portability repair now passes the
 exact audited source path to Git's `safe.directory` setting for each read-only
 provenance command. That repair changed the current digest to
 `2c60837f7c36d8b886de5152de206db436a5a5d966b5279587cec121676ee5cf`.
-Both splits were rerun after that repair and now pass under the current digest;
-the older `5ea81a...` artifacts remain intentionally stale.
+Both splits passed under that digest. A later statistically sized Safety run
+found that repeated resets could exhaust native MuJoCo model memory. The
+episode-lifetime repair changed the current digest to
+`fb8e2a110caa58938701342e2ed5be337e81a3ed61a59c87fd68a9de2a688a73`;
+the `2c60837...` and older `5ea81a...` rehearsals are now intentionally stale
+and must be regenerated before registration.
 The split manifest hashes remained
 `6de94c6456eccff522e9f9f359d589d10280f551a9616920f17746652a1c235e`
 and `da9faca59d0e1a59e8d98e03d99cdd86b698c5ac618b574492e110d71a2475c2`.
@@ -462,10 +491,10 @@ single machine-readable audit. It verifies all seven clean source locks, both
 36-task portable rehearsals, separate 20-episode-per-policy development and
 calibration suites with exact replay, all 12 learned baseline manifests and
 physical checkpoint schedules, calibration selection, selected-checkpoint
-replay, and all six nonlearned reference manifests. The current audit passes
-the complete 6/6 nonlearned gate and 2/12 learned gate; the two sized suites and
-ten missing learned references remain explicit failures until their audited
-jobs complete.
+replay, all six nonlearned reference manifests, and the current-hash statistical
+calibration suite. The current audit passes the complete 6/6 nonlearned gate
+and 2/12 learned gate; the statistical reruns, two sized suites, and ten missing
+learned references remain explicit failures until their audited jobs complete.
 It continues to state `confirmation_execution_authorized: false` even after
 all readiness checks pass; preregistration remains a separate required action.
 

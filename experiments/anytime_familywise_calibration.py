@@ -22,6 +22,10 @@ from experiments.anytime_familywise_router import (
     AnytimeFamilywiseRouter,
     RouteDecision,
 )
+from experiments.frontier_v2_statistical_hash import (
+    STATISTICAL_IMPLEMENTATION_FILES,
+    statistical_implementation_sha256,
+)
 
 
 @dataclass(frozen=True)
@@ -454,6 +458,8 @@ def main() -> None:
     ]
     payload = {
         "design": "riskshiftbench-v2-anytime-familywise-synthetic-calibration",
+        "statistical_implementation_files": list(STATISTICAL_IMPLEMENTATION_FILES),
+        "statistical_implementation_sha256": statistical_implementation_sha256(),
         "summaries": summaries,
     }
     rendered = json.dumps(payload, indent=2, sort_keys=True) + "\n"

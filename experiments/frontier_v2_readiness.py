@@ -19,6 +19,9 @@ from experiments.frontier_v2_rehearsal_audit import (
     audit_split_coverage_payloads,
 )
 from experiments.frontier_v2_source_audit import audit_source_suite
+from experiments.frontier_v2_statistical_readiness import (
+    audit_statistical_readiness,
+)
 
 
 LEARNED_BASELINES = tuple(
@@ -52,6 +55,7 @@ def registration_readiness(
     baseline_source_root: Path,
     rehearsal_root: Path,
     baseline_root: Path,
+    statistical_root: Path = Path("artifacts/frontier_v2_development"),
     v1_development_root: Path = Path("artifacts/external_development_v1"),
     v1_router_root: Path = Path("artifacts/external_router_lock_v1"),
 ) -> dict:
@@ -66,6 +70,29 @@ def registration_readiness(
             "codebase_count": environment_sources["codebase_count"],
         }
     )
+
+    try:
+        statistical_audit = audit_statistical_readiness(statistical_root)
+    except (OSError, RuntimeError, ValueError, json.JSONDecodeError) as error:
+        missing.append(f"statistical calibration: {error}")
+        checks.append({"gate": "statistical_calibration", "passed": False})
+        statistical_audit = None
+    else:
+        checks.append(
+            {
+                "gate": "statistical_calibration",
+                "passed": True,
+                "primary_null_families": statistical_audit["primary_null"][0][
+                    "trials"
+                ],
+                "predictable_null_families": sum(
+                    item["trials"] for item in statistical_audit["predictable_null"]
+                ),
+                "paired_method_trials": statistical_audit[
+                    "paired_method_comparison"
+                ]["trials"],
+            }
+        )
     baseline_sources = audit_baseline_source_suite(baseline_source_root)
     checks.append(
         {
@@ -76,8 +103,8 @@ def registration_readiness(
     )
 
     rehearsal_directories = {
-        "development": rehearsal_root / "development_portable_1ep",
-        "calibration": rehearsal_root / "calibration_portable_1ep",
+        "development": rehearsal_root / "development_portable_1ep_episode_lifetime",
+        "calibration": rehearsal_root / "calibration_portable_1ep_episode_lifetime",
     }
     for split, directory in rehearsal_directories.items():
         try:
@@ -103,8 +130,8 @@ def registration_readiness(
             )
 
     sized_rehearsal_directories = {
-        "development": rehearsal_root / "development_portable_20ep",
-        "calibration": rehearsal_root / "calibration_portable_20ep",
+        "development": rehearsal_root / "development_portable_20ep_episode_lifetime",
+        "calibration": rehearsal_root / "calibration_portable_20ep_episode_lifetime",
     }
     for split, directory in sized_rehearsal_directories.items():
         try:
@@ -205,6 +232,7 @@ def registration_readiness(
         "checks": checks,
         "learned_baselines": audited_baselines,
         "nonlearned_baselines": audited_nonlearned,
+        "statistical_calibration": statistical_audit,
         "missing_or_invalid": missing,
         "confirmation_execution_authorized": False,
     }
@@ -233,6 +261,11 @@ def parse_args() -> argparse.Namespace:
         default=Path("artifacts/frontier_v2_baselines"),
     )
     parser.add_argument(
+        "--statistical-root",
+        type=Path,
+        default=Path("artifacts/frontier_v2_development"),
+    )
+    parser.add_argument(
         "--v1-development-root",
         type=Path,
         default=Path("artifacts/external_development_v1"),
@@ -253,6 +286,7 @@ def main() -> None:
         baseline_source_root=args.baseline_source_root,
         rehearsal_root=args.rehearsal_root,
         baseline_root=args.baseline_root,
+        statistical_root=args.statistical_root,
         v1_development_root=args.v1_development_root,
         v1_router_root=args.v1_router_root,
     )

@@ -31,6 +31,10 @@ from experiments.familywise_policy_baselines import (
     AlphaSpendingFamilywiseRouter,
     fixed_sample_rejections,
 )
+from experiments.frontier_v2_statistical_hash import (
+    STATISTICAL_IMPLEMENTATION_FILES,
+    statistical_implementation_sha256,
+)
 
 
 DEFAULT_METHODS = (
@@ -475,6 +479,8 @@ def main() -> None:
     )
     payload = {
         "design": "riskshiftbench-v2-paired-familywise-method-comparison",
+        "statistical_implementation_files": list(STATISTICAL_IMPLEMENTATION_FILES),
+        "statistical_implementation_sha256": statistical_implementation_sha256(),
         "summary": summary,
     }
     rendered = json.dumps(payload, indent=2, sort_keys=True) + "\n"

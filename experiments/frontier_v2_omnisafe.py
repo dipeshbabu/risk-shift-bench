@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import gc
 import importlib.metadata
 import json
 import math
@@ -166,10 +167,10 @@ def register_pooled_safety_environment() -> None:
             self._episode_index = -1
             self._steps = 0
             self._num_envs = 1
-            self._environments = [
-                safety_gymnasium.make(task.environment_id) for task in self._tasks
-            ]
-            self._environment = self._environments[0]
+            self._environment_index = 0
+            self._environment = safety_gymnasium.make(
+                self._tasks[self._environment_index].environment_id
+            )
             self._action_space = self._environment.action_space
             self._observation_size = PADDED_OBSERVATION_SIZE[self._domain]
             self._observation_space = spaces.Box(
@@ -178,12 +179,18 @@ def register_pooled_safety_environment() -> None:
                 shape=(self._observation_size,),
                 dtype=np.float32,
             )
-            if any(
-                environment.observation_space.shape[0] > self._observation_size
-                or environment.action_space.shape != self._action_space.shape
-                for environment in self._environments
-            ):
-                raise RuntimeError("pooled Safety-Gymnasium spaces changed")
+            for task in self._tasks[1:]:
+                probe = safety_gymnasium.make(task.environment_id)
+                try:
+                    if (
+                        probe.observation_space.shape[0] > self._observation_size
+                        or probe.action_space.shape != self._action_space.shape
+                    ):
+                        raise RuntimeError("pooled Safety-Gymnasium spaces changed")
+                finally:
+                    probe.close()
+                    del probe
+            gc.collect()
 
         def _encode(self, observation):
             encoded = np.zeros(self._observation_size, dtype=np.float32)
@@ -202,7 +209,14 @@ def register_pooled_safety_environment() -> None:
             index = pooled_safety_task_index(
                 self._training_seed, self._episode_index
             )
-            self._environment = self._environments[index]
+            if index != self._environment_index:
+                self._environment.close()
+                del self._environment
+                gc.collect()
+                self._environment = safety_gymnasium.make(
+                    self._tasks[index].environment_id
+                )
+                self._environment_index = index
             observation, info = self._environment.reset(
                 seed=self._training_seed + self._episode_index
             )
@@ -231,8 +245,7 @@ def register_pooled_safety_environment() -> None:
             self._training_seed = int(seed)
 
         def close(self) -> None:
-            for environment in self._environments:
-                environment.close()
+            self._environment.close()
 
         def render(self):
             return self._environment.render()
@@ -327,15 +340,15 @@ def evaluate_omnisafe_checkpoint(
         parameters = task.parameter_dict()
         cost_weight = float(parameters["cost_weight"])
         max_steps = int(parameters["max_steps"])
-        environment = safety_gymnasium.make(task.environment_id)
         scores = []
         costs = []
-        try:
-            for seed in expected_episode_seeds(
-                task,
-                episodes=episodes_per_task,
-                seed_base=canonical_episode_seed_base(task),
-            ):
+        for seed in expected_episode_seeds(
+            task,
+            episodes=episodes_per_task,
+            seed_base=canonical_episode_seed_base(task),
+        ):
+            environment = safety_gymnasium.make(task.environment_id)
+            try:
                 observation, _info = environment.reset(seed=seed)
                 raw_return = 0.0
                 total_cost = 0.0
@@ -373,8 +386,10 @@ def evaluate_omnisafe_checkpoint(
                     bounded_score(0.5 + 0.5 * math.tanh(raw_utility / 25.0))
                 )
                 costs.append(total_cost)
-        finally:
-            environment.close()
+            finally:
+                environment.close()
+                del environment
+                gc.collect()
         task_scores.append(fmean(scores))
         task_costs.append(fmean(costs))
     return {
@@ -418,7 +433,11 @@ def train_omnisafe_seed(
         TRAINING_ENVIRONMENTS[baseline.domain],
         custom_cfgs=config,
     )
-    agent.learn()
+    try:
+        agent.learn()
+    finally:
+        agent.agent._env.close()
+        gc.collect()
     log_directory = Path(agent.agent.logger.log_dir)
     checkpoints = []
     for epoch, step in expected_omnisafe_checkpoints(total_steps):

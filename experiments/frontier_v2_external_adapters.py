@@ -8,6 +8,7 @@ confirmation tasks; a separately registered wrapper will be required later.
 from __future__ import annotations
 
 import heapq
+import gc
 import importlib.metadata
 import math
 import sys
@@ -827,12 +828,12 @@ def run_safety_gymnasium_task(
     max_steps = int(parameters["max_steps"])
     cost_weight = float(parameters["cost_weight"])
     rows = []
-    environment = safety_gymnasium.make(task.environment_id)
-    try:
-        seeds = expected_episode_seeds(
-            task, episodes=episodes, seed_base=seed_base
-        )
-        for episode, seed in enumerate(seeds):
+    seeds = expected_episode_seeds(
+        task, episodes=episodes, seed_base=seed_base
+    )
+    for episode, seed in enumerate(seeds):
+        environment = safety_gymnasium.make(task.environment_id)
+        try:
             observation, _info = environment.reset(seed=seed)
             raw_return = 0.0
             total_cost = 0.0
@@ -875,8 +876,10 @@ def run_safety_gymnasium_task(
                     successes=successes,
                 )
             )
-    finally:
-        environment.close()
+        finally:
+            environment.close()
+            del environment
+            gc.collect()
     return rows
 
 
