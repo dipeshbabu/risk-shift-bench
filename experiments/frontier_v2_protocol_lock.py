@@ -32,6 +32,7 @@ from experiments.frontier_v2_resolution_bound_check import RESOLUTION_BOUND_FILE
 LOCKED_PROTOCOL_FILES = (
     "experiments/frontier_v2_router_lock.py",
     "experiments/frontier_v2_confirmation_runtime.py",
+    "experiments/frontier_v2_competitive_evaluation.py",
     "experiments/frontier_v2_protocol_lock.py",
     "experiments/frontier_v2_readiness.py",
 )
@@ -179,6 +180,10 @@ def build_locked_design(
             },
             "competitive_references": {
                 "evaluation_episodes_per_task": 100,
+                "learned_evaluation_unit": (
+                    "100 episodes per task for each of five calibration-selected "
+                    "training-seed checkpoints; aggregate with equal checkpoint-seed weight"
+                ),
                 "checkpoint_rule": (
                     "Use only the calibration-selected checkpoint recorded in each "
                     "registered baseline manifest."
