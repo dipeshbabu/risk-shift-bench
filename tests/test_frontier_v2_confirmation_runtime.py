@@ -11,8 +11,10 @@ from experiments.frontier_v2_confirmation_runtime import (
     load_pilot_records,
     next_pilot_request,
     replay_pilot_records,
+    primary_analysis_from_task_effects,
 )
 from experiments.frontier_v2_external_design import (
+    DOMAIN_SPECS,
     all_tasks,
     canonical_sha256,
     outcome_implementation_sha256,
@@ -150,3 +152,19 @@ def test_worker_only_accepts_unique_next_authenticated_step(tmp_path) -> None:
     request["within_task_index"] += 1
     with pytest.raises(RuntimeError, match="unique next"):
         authenticate_worker_request(lock, tmp_path / "missing.jsonl", request)
+
+
+def test_primary_analysis_preserves_equal_domain_weighting() -> None:
+    tasks = all_tasks("confirmation")
+    route_effects = {task.name: 0.1 for task in tasks}
+    candidate_effects = {task.name: 0.2 for task in tasks}
+    result = primary_analysis_from_task_effects(
+        route_effects,
+        candidate_effects,
+        bootstrap_replicates=20,
+        sign_flip_replicates=20,
+        seed=7,
+    )
+    assert result["equal_domain_mean_route_effect"] == pytest.approx(0.1)
+    assert result["equal_domain_mean_candidate_everywhere_effect"] == pytest.approx(0.2)
+    assert set(result["leave_one_domain_out_route_effects"]) == set(DOMAIN_SPECS)

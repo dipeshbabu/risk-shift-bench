@@ -194,6 +194,7 @@ def build_locked_design(
             "task_stratified_bootstrap_replicates": 10_000,
             "domain_resampling_bootstrap_replicates": 10_000,
             "task_level_sign_flip_replicates": 100_000,
+            "random_seed": 62_000_001,
             "secondary_outputs": [
                 "total paired pilot observations",
                 "accepted, rejected, budget-exhausted, and harmful accepted routes",
