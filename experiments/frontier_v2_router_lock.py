@@ -295,6 +295,38 @@ def write_router_lock(
     return payload
 
 
+def audit_router_lock(
+    path: Path,
+    *,
+    development_root: Path,
+    calibration_root: Path,
+) -> dict:
+    """Recompute the lock from its frozen inputs and require exact equality."""
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    expected = build_router_lock(development_root, calibration_root)
+    if payload != expected:
+        raise RuntimeError("router lock differs from the deterministic frozen design")
+    return {
+        "protocol_id": payload["protocol_id"],
+        "router_lock_canonical_sha256": payload[
+            "router_lock_canonical_sha256"
+        ],
+        "proposal_family_size": payload["proposal_family_size"],
+        "domain_count": len(payload["candidate_selection"]["selected_by_domain"]),
+        "paired_observation_budget": payload["cost_accounting"][
+            "paired_observation_budget"
+        ],
+        "confirmation_task_manifest_sha256": payload[
+            "confirmation_task_manifest_sha256"
+        ],
+        "outcome_implementation_sha256": payload[
+            "outcome_implementation_sha256"
+        ],
+        "confirmation_execution_authorized": False,
+    }
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(

@@ -18,6 +18,7 @@ from experiments.frontier_v2_rehearsal_audit import (
     audit_rehearsal_payload,
     audit_split_coverage_payloads,
 )
+from experiments.frontier_v2_router_lock import audit_router_lock
 from experiments.frontier_v2_source_audit import audit_source_suite
 from experiments.frontier_v2_statistical_readiness import (
     audit_statistical_readiness,
@@ -56,6 +57,7 @@ def registration_readiness(
     rehearsal_root: Path,
     baseline_root: Path,
     statistical_root: Path = Path("artifacts/frontier_v2_development"),
+    router_lock_path: Path = Path("artifacts/frontier_v2_router_lock/router_lock.json"),
     v1_development_root: Path = Path("artifacts/external_development_v1"),
     v1_router_root: Path = Path("artifacts/external_router_lock_v1"),
 ) -> dict:
@@ -157,6 +159,31 @@ def registration_readiness(
                 }
             )
 
+    try:
+        router_audit = audit_router_lock(
+            router_lock_path,
+            development_root=sized_rehearsal_directories["development"],
+            calibration_root=sized_rehearsal_directories["calibration"],
+        )
+    except (OSError, RuntimeError, ValueError, json.JSONDecodeError) as error:
+        missing.append(f"router lock: {error}")
+        checks.append({"gate": "outcome_free_router_lock", "passed": False})
+        router_audit = None
+    else:
+        checks.append(
+            {
+                "gate": "outcome_free_router_lock",
+                "passed": True,
+                "proposal_family_size": router_audit["proposal_family_size"],
+                "paired_observation_budget": router_audit[
+                    "paired_observation_budget"
+                ],
+                "router_lock_canonical_sha256": router_audit[
+                    "router_lock_canonical_sha256"
+                ],
+            }
+        )
+
     audited_baselines = []
     for baseline in LEARNED_BASELINES:
         manifest = baseline_root / baseline.domain / baseline.name / "manifest.json"
@@ -233,6 +260,7 @@ def registration_readiness(
         "learned_baselines": audited_baselines,
         "nonlearned_baselines": audited_nonlearned,
         "statistical_calibration": statistical_audit,
+        "router_lock": router_audit,
         "missing_or_invalid": missing,
         "confirmation_execution_authorized": False,
     }
@@ -266,6 +294,11 @@ def parse_args() -> argparse.Namespace:
         default=Path("artifacts/frontier_v2_development"),
     )
     parser.add_argument(
+        "--router-lock",
+        type=Path,
+        default=Path("artifacts/frontier_v2_router_lock/router_lock.json"),
+    )
+    parser.add_argument(
         "--v1-development-root",
         type=Path,
         default=Path("artifacts/external_development_v1"),
@@ -287,6 +320,7 @@ def main() -> None:
         rehearsal_root=args.rehearsal_root,
         baseline_root=args.baseline_root,
         statistical_root=args.statistical_root,
+        router_lock_path=args.router_lock,
         v1_development_root=args.v1_development_root,
         v1_router_root=args.v1_router_root,
     )
