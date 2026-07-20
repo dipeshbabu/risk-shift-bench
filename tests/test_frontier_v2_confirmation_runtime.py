@@ -5,7 +5,10 @@ from copy import deepcopy
 import pytest
 
 from experiments.frontier_v2_confirmation_runtime import (
+    append_pilot_record,
+    authenticate_worker_request,
     build_pilot_record,
+    load_pilot_records,
     next_pilot_request,
     replay_pilot_records,
 )
@@ -126,3 +129,24 @@ def test_router_lock_hash_is_required_before_pilot_replay() -> None:
     lock["anytime_plan"]["global_observation_budget"] += 1
     with pytest.raises(RuntimeError, match="canonical hash"):
         replay_pilot_records(lock, [])
+
+
+def test_pilot_jsonl_round_trip_preserves_hash_chain(tmp_path) -> None:
+    lock = _router_lock()
+    records: list[dict] = []
+    _append(lock, records)
+    path = tmp_path / "pilot.jsonl"
+    append_pilot_record(path, records[0])
+    loaded = load_pilot_records(path)
+    assert loaded == records
+    assert replay_pilot_records(lock, loaded).total_observations() == 1
+
+
+def test_worker_only_accepts_unique_next_authenticated_step(tmp_path) -> None:
+    lock = _router_lock()
+    request = next_pilot_request(lock, [])
+    assert request is not None
+    authenticate_worker_request(lock, tmp_path / "missing.jsonl", request)
+    request["within_task_index"] += 1
+    with pytest.raises(RuntimeError, match="unique next"):
+        authenticate_worker_request(lock, tmp_path / "missing.jsonl", request)

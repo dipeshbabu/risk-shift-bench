@@ -7,13 +7,21 @@ must validate before collecting or finalizing any confirmation outcome.
 
 from __future__ import annotations
 
-from dataclasses import asdict
+import argparse
+import json
+import os
+import subprocess
+import sys
+from dataclasses import asdict, replace
+from pathlib import Path
 
 from experiments.anytime_familywise_router import (
     AnytimeFamilywisePlan,
     AnytimeFamilywiseRouter,
 )
 from experiments.frontier_v2_external_design import (
+    DOMAIN_SPECS,
+    V2ExternalTask,
     all_tasks,
     canonical_episode_seed_base,
     canonical_sha256,
@@ -21,6 +29,15 @@ from experiments.frontier_v2_external_design import (
     outcome_implementation_sha256,
     task_manifest_sha256,
 )
+from experiments.frontier_v2_external_adapters import (
+    outcome_rows,
+    run_gymnasium_task,
+    run_minigrid_task,
+    run_or_gym_task,
+    run_safety_gymnasium_task,
+)
+from experiments.frontier_v2_protocol_lock import validate_protocol
+from experiments.frontier_v2_source_audit import SOURCE_DIRECTORIES
 
 
 PILOT_RECORD_PROTOCOL = "riskshiftbench-frontier-v2-pilot-record-v1"
@@ -325,3 +342,352 @@ def pilot_decision_summary(router_lock: dict, records: list[dict]) -> dict:
             records[-1]["record_sha256"] if records else None
         ),
     }
+
+
+def load_pilot_records(path: Path) -> list[dict]:
+    if not path.exists():
+        return []
+    records = []
+    with path.open(encoding="utf-8") as handle:
+        for line_number, line in enumerate(handle, start=1):
+            if not line.strip():
+                raise RuntimeError(f"blank line in pilot log at {line_number}")
+            try:
+                records.append(json.loads(line))
+            except json.JSONDecodeError as error:
+                raise RuntimeError(
+                    f"invalid pilot JSON record at line {line_number}"
+                ) from error
+    return records
+
+
+def append_pilot_record(path: Path, record: dict) -> None:
+    """Durably append one authenticated record without rewriting prior outcomes."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    encoded = json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n"
+    with path.open("a", encoding="utf-8", newline="\n") as handle:
+        handle.write(encoded)
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
+def write_json_once(path: Path, payload: dict) -> None:
+    if path.exists():
+        raise FileExistsError(f"refusing to overwrite confirmation result: {path}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("x", encoding="utf-8", newline="\n") as handle:
+        handle.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+
+
+def _registered_adapter_task(task: V2ExternalTask) -> V2ExternalTask:
+    """Create the capability-bearing view consumed by development adapters.
+
+    The environment identity, parameters, features, and task name are unchanged.
+    Only the execution label is changed after the registered wrapper has passed
+    every protocol check. This is the separately registered wrapper anticipated
+    by the development adapters' confirmation guard.
+    """
+
+    if task.split != "confirmation":
+        raise RuntimeError("registered adapter capability requires a confirmation task")
+    return replace(task, split="calibration")
+
+
+def _run_registered_policy(
+    task: V2ExternalTask,
+    policy: str,
+    *,
+    episodes: int,
+    seed_base: int,
+    source_root: Path,
+) -> list[dict]:
+    executable = _registered_adapter_task(task)
+    source = source_root / SOURCE_DIRECTORIES[DOMAIN_SPECS[task.domain].codebase]
+    codebase = DOMAIN_SPECS[task.domain].codebase
+    if codebase == "gymnasium":
+        outcomes = run_gymnasium_task(executable, policy, episodes, seed_base, source)
+    elif codebase == "minigrid":
+        outcomes = run_minigrid_task(executable, policy, episodes, seed_base, source)
+    elif codebase == "or_gym":
+        outcomes = run_or_gym_task(executable, policy, episodes, seed_base, source)
+    elif codebase == "safety_gymnasium":
+        outcomes = run_safety_gymnasium_task(
+            executable, policy, episodes, seed_base, source
+        )
+    else:
+        raise KeyError(codebase)
+    return outcome_rows(outcomes)
+
+
+def collect_registered_pair(
+    design: dict,
+    request: dict,
+    *,
+    codebase: str,
+) -> dict:
+    """Collect exactly one registered pilot pair inside its pinned environment."""
+
+    router_lock = design["router_lock"]["content"]
+    proposals = _proposal_index(router_lock)
+    tasks = _confirmation_task_index()
+    task_name = request["task"]
+    try:
+        task = tasks[task_name]
+        proposal = proposals[task_name]
+    except KeyError as error:
+        raise RuntimeError("worker received an unknown confirmation task") from error
+    if DOMAIN_SPECS[task.domain].codebase != codebase:
+        raise RuntimeError("worker received a task from another codebase")
+    within_task_index = int(request["within_task_index"])
+    expected_seed_base = (
+        canonical_episode_seed_base(task, stream="pilot") + within_task_index
+    )
+    if int(request["seed_base"]) != expected_seed_base:
+        raise RuntimeError("worker pilot seed base differs from the registered schedule")
+    if request["candidate_policy"] != proposal["candidate_policy"] or request[
+        "fallback_policy"
+    ] != proposal["fallback_policy"]:
+        raise RuntimeError("worker pilot policy pair differs from the router lock")
+    source_root = Path(design["artifact_roots"]["environment_source_root"])
+    candidate = _run_registered_policy(
+        task,
+        proposal["candidate_policy"],
+        episodes=1,
+        seed_base=expected_seed_base,
+        source_root=source_root,
+    )[0]
+    fallback = _run_registered_policy(
+        task,
+        proposal["fallback_policy"],
+        episodes=1,
+        seed_base=expected_seed_base,
+        source_root=source_root,
+    )[0]
+    return {"candidate_outcome": candidate, "fallback_outcome": fallback}
+
+
+def authenticate_worker_request(
+    router_lock: dict,
+    pilot_log_path: Path,
+    request: dict,
+) -> None:
+    """Require the worker request to equal the unique next hash-chained step."""
+
+    records = load_pilot_records(pilot_log_path)
+    expected_request = next_pilot_request(router_lock, records)
+    observed_request = {key: request.get(key) for key in expected_request or {}}
+    if expected_request is None or observed_request != expected_request:
+        raise RuntimeError(
+            "worker request is not the unique next authenticated pilot step"
+        )
+
+
+def run_worker(protocol_path: Path, codebase: str, pilot_log_path: Path) -> None:
+    """Serve registered episode requests over newline-delimited JSON."""
+
+    _wrapper, design = validate_protocol(protocol_path, require_registration=True)
+    if codebase not in set(SOURCE_DIRECTORIES):
+        raise KeyError(codebase)
+    print(json.dumps({"status": "ready", "codebase": codebase}), flush=True)
+    for line in sys.stdin:
+        try:
+            request = json.loads(line)
+            if request.get("command") == "close":
+                print(json.dumps({"status": "closed", "codebase": codebase}), flush=True)
+                return
+            if request.get("command") != "pilot_pair":
+                raise RuntimeError("unknown registered worker command")
+            authenticate_worker_request(
+                design["router_lock"]["content"], pilot_log_path, request
+            )
+            result = collect_registered_pair(design, request, codebase=codebase)
+            print(json.dumps({"status": "ok", **result}, sort_keys=True), flush=True)
+        except Exception as error:  # worker boundary must return an actionable failure
+            print(
+                json.dumps(
+                    {
+                        "status": "error",
+                        "error_type": type(error).__name__,
+                        "error": str(error),
+                    },
+                    sort_keys=True,
+                ),
+                flush=True,
+            )
+            return
+
+
+class RegisteredWorkerPool:
+    def __init__(
+        self,
+        protocol_path: Path,
+        interpreters: dict[str, Path],
+        pilot_log_path: Path,
+    ):
+        self.protocol_path = protocol_path
+        self.interpreters = interpreters
+        self.pilot_log_path = pilot_log_path
+        self.processes: dict[str, subprocess.Popen[str]] = {}
+
+    def _start(self, codebase: str) -> subprocess.Popen[str]:
+        try:
+            interpreter = self.interpreters[codebase]
+        except KeyError as error:
+            raise RuntimeError(f"no registered worker interpreter for {codebase}") from error
+        if not interpreter.is_file():
+            raise RuntimeError(f"registered worker interpreter is missing: {interpreter}")
+        process = subprocess.Popen(
+            [
+                str(interpreter),
+                "-m",
+                "experiments.frontier_v2_confirmation_runtime",
+                "worker",
+                "--protocol",
+                str(self.protocol_path),
+                "--codebase",
+                codebase,
+                "--pilot-log",
+                str(self.pilot_log_path),
+            ],
+            cwd=Path(__file__).resolve().parents[1],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+        )
+        if process.stdout is None:
+            raise RuntimeError("registered worker stdout was not created")
+        ready_line = process.stdout.readline()
+        if not ready_line:
+            stderr = process.stderr.read() if process.stderr else ""
+            raise RuntimeError(f"registered worker failed to start: {stderr}")
+        ready = json.loads(ready_line)
+        if ready != {"status": "ready", "codebase": codebase}:
+            raise RuntimeError(f"registered worker returned invalid readiness: {ready}")
+        self.processes[codebase] = process
+        return process
+
+    def request(self, codebase: str, request: dict) -> dict:
+        process = self.processes.get(codebase) or self._start(codebase)
+        if process.stdin is None or process.stdout is None:
+            raise RuntimeError("registered worker pipes are unavailable")
+        process.stdin.write(json.dumps({"command": "pilot_pair", **request}) + "\n")
+        process.stdin.flush()
+        response_line = process.stdout.readline()
+        if not response_line:
+            stderr = process.stderr.read() if process.stderr else ""
+            raise RuntimeError(f"registered worker exited without a response: {stderr}")
+        response = json.loads(response_line)
+        if response.get("status") != "ok":
+            raise RuntimeError(
+                f"registered worker failed: {response.get('error_type')}: "
+                f"{response.get('error')}"
+            )
+        return response
+
+    def close(self) -> None:
+        for process in self.processes.values():
+            if process.poll() is not None:
+                continue
+            if process.stdin is not None:
+                process.stdin.write(json.dumps({"command": "close"}) + "\n")
+                process.stdin.flush()
+            process.wait(timeout=30)
+
+    def __enter__(self) -> RegisteredWorkerPool:
+        return self
+
+    def __exit__(self, _type, _value, _traceback) -> None:
+        self.close()
+
+
+def run_registered_pilot(
+    protocol_path: Path,
+    *,
+    interpreters: dict[str, Path],
+) -> dict:
+    """Resume or complete the registered primary adaptive pilot."""
+
+    _wrapper, design = validate_protocol(protocol_path, require_registration=True)
+    router_lock = design["router_lock"]["content"]
+    output_root = Path(design["confirmation"]["output_root"])
+    log_path = output_root / "pilot" / "primary_records.jsonl"
+    decisions_path = output_root / "pilot" / "primary_decisions.json"
+    records = load_pilot_records(log_path)
+    replay_pilot_records(router_lock, records)
+    if decisions_path.exists():
+        observed = json.loads(decisions_path.read_text(encoding="utf-8"))
+        if observed != pilot_decision_summary(router_lock, records):
+            raise RuntimeError("frozen pilot decisions changed")
+        return observed
+
+    with RegisteredWorkerPool(protocol_path, interpreters, log_path) as workers:
+        while True:
+            request = next_pilot_request(router_lock, records)
+            if request is None:
+                break
+            task = _confirmation_task_index()[request["task"]]
+            codebase = DOMAIN_SPECS[task.domain].codebase
+            outcome = workers.request(codebase, request)
+            record = build_pilot_record(
+                router_lock,
+                sequence_index=request["sequence_index"],
+                within_task_index=request["within_task_index"],
+                task_name=request["task"],
+                candidate_outcome=outcome["candidate_outcome"],
+                fallback_outcome=outcome["fallback_outcome"],
+                previous_record_sha256=request["previous_record_sha256"],
+            )
+            append_pilot_record(log_path, record)
+            records.append(record)
+    summary = pilot_decision_summary(router_lock, records)
+    write_json_once(decisions_path, summary)
+    return summary
+
+
+def _default_interpreters() -> dict[str, Path]:
+    return {
+        "gymnasium": Path("artifacts/frontier_v2_envs/gymnasium/Scripts/python.exe"),
+        "or_gym": Path("artifacts/frontier_v2_envs/or-gym/Scripts/python.exe"),
+        "safety_gymnasium": Path(
+            "artifacts/frontier_v2_envs/safety-gymnasium/Scripts/python.exe"
+        ),
+        "minigrid": Path("artifacts/frontier_v2_envs/minigrid/Scripts/python.exe"),
+    }
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    commands = parser.add_subparsers(dest="command", required=True)
+    worker = commands.add_parser("worker")
+    worker.add_argument("--protocol", type=Path, required=True)
+    worker.add_argument("--codebase", choices=tuple(SOURCE_DIRECTORIES), required=True)
+    worker.add_argument("--pilot-log", type=Path, required=True)
+    pilot = commands.add_parser("pilot")
+    pilot.add_argument("--protocol", type=Path, required=True)
+    for codebase, path in _default_interpreters().items():
+        pilot.add_argument(
+            f"--{codebase.replace('_', '-')}-python",
+            type=Path,
+            default=path,
+        )
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    if args.command == "worker":
+        run_worker(args.protocol, args.codebase, args.pilot_log)
+        return
+    interpreters = {
+        codebase: getattr(args, f"{codebase}_python")
+        for codebase in SOURCE_DIRECTORIES
+    }
+    summary = run_registered_pilot(args.protocol, interpreters=interpreters)
+    print(json.dumps(summary, indent=2, sort_keys=True))
+
+
+if __name__ == "__main__":
+    main()
