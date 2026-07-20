@@ -26,6 +26,7 @@ from experiments.frontier_v2_statistical_readiness import (
     PREDICTABLE_NULL_FILE,
     PRIMARY_NULL_FILE,
 )
+from experiments.frontier_v2_resolution_bound_check import RESOLUTION_BOUND_FILE
 
 
 LOCKED_PROTOCOL_FILES = (
@@ -117,6 +118,7 @@ def build_locked_design(
             PRIMARY_NULL_FILE,
             PREDICTABLE_NULL_FILE,
             METHOD_COMPARISON_FILE,
+            RESOLUTION_BOUND_FILE,
         )
     ]
     return {
